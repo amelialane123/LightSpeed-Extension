@@ -258,13 +258,21 @@ def api_run():
 # ----- Connect (multi-tenant OAuth + setup) -----
 
 def _oauth_redirect_uri() -> str:
-    """Redirect URI for OAuth. Use HTTPS from .env (Lightspeed only allows https)."""
+    """Redirect URI for OAuth. Use HTTPS (Lightspeed only allows https)."""
     uri = (os.environ.get("LIGHTSPEED_REDIRECT_URI") or "").strip()
     if uri:
         return uri.rstrip("/")
     base = (os.environ.get("BACKEND_PUBLIC_URL") or "").strip().rstrip("/")
     if base:
         return f"{base}/connect/callback"
+    # Behind a proxy (e.g. Railway): use X-Forwarded headers so we get https and correct host
+    try:
+        proto = (request.headers.get("X-Forwarded-Proto") or "https").strip().lower()
+        host = (request.headers.get("X-Forwarded-Host") or request.host or "").strip()
+        if host:
+            return f"{proto}://{host}/connect/callback"
+    except Exception:
+        pass
     return request.url_root.rstrip("/") + "/connect/callback"
 
 

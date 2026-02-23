@@ -12,10 +12,10 @@ Use the extension to export from Lightspeed with one click. You only need to con
 
 ### Install the extension in Chrome
 
-1. **Download the extension:** Clone or download this repo, or [download the zip](https://github.com/amelialane123/LightSpeed-Extension/archive/refs/heads/main.zip) and unzip it.
-2. Open **Chrome** and go to [chrome extensions] (chrome://extensions).
+1. **Download the extension:** [Download the extension zip](https://github.com/amelialane123/LightSpeed-Extension/releases/latest/download/chrome-extension.zip) and unzip it. (Or clone this repo and use the **`chrome-extension`** folder.)
+2. Open **Chrome** and go to [chrome extensions](chrome://extensions).
 3. Turn on **Developer mode** (top right).
-4. Click **Load unpacked** and select the **`chrome-extension`** folder inside the project (the folder that contains `manifest.json`).
+4. Click **Load unpacked** and select the unzipped **`chrome-extension`** folder (the folder that contains `manifest.json`).
 5. You will automatically be brought to the authorization flow. Follow those steps.
 6. The extension is now installed.
 

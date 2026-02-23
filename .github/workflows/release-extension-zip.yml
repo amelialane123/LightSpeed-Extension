@@ -1,0 +1,15 @@
+# On release, attach a zip of only the chrome-extension folder so users can
+# download just the extension from Releases.
+name: Release extension zip
+on:
+  release:
+    types: [published]
+jobs:
+  zip-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: zip -r chrome-extension.zip chrome-extension
+      - run: gh release upload "${{ github.event.release.tag_name }}" chrome-extension.zip
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

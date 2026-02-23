@@ -319,7 +319,6 @@ CONNECT_HTML = """
     <p class="muted">Open the Airtable where you want exports to go, then copy the URL from your browser's address bar and paste it here.</p>
     <button type="submit">Continue to Lightspeed login</button>
   </form>
-  <p class="muted">Set <code>LIGHTSPEED_REDIRECT_URI</code> in .env to an HTTPS URL (e.g. Postman callback). You'll paste the redirect URL back here after authorizing.</p>
 </body>
 </html>
 """

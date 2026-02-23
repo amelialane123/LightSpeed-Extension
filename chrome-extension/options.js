@@ -3,30 +3,37 @@
 // Must match API_BASE in background.js (your deployed backend URL, no trailing slash)
 const API_BASE = 'https://lightspeed-extension-production.up.railway.app';
 
-document.getElementById('save').onclick = function () {
-  const key = (document.getElementById('key').value || '').trim();
-  const status = document.getElementById('status');
-  if (!key) {
-    status.textContent = 'Enter a connection key.';
-    status.className = 'muted';
-    return;
-  }
-  chrome.storage.sync.set({ connection_id: key }, function () {
-    status.textContent = 'Saved. You can use the Export to Airtable button on Lightspeed.';
-    status.className = 'saved';
-    updateConfigureLink(key);
-    showConnectedState(key);
-  });
-};
-
 function updateConfigureLink(connectionId) {
   const el = document.getElementById('configure-link');
-  if (connectionId) {
+  if (connectionId && el) {
     const url = API_BASE + '/settings?key=' + encodeURIComponent(connectionId);
     el.innerHTML = '<a href="' + url + '" target="_blank" rel="noopener">Configure which fields to export</a>';
-  } else {
+  } else if (el) {
     el.textContent = '';
   }
+}
+
+function loadConnectionInfo(connectionId) {
+  const currentEl = document.getElementById('base-url-current');
+  const inputEl = document.getElementById('base-url');
+  const statusEl = document.getElementById('base-url-status');
+  if (!connectionId || !currentEl || !inputEl) return;
+  currentEl.textContent = 'Loading…';
+  inputEl.value = '';
+  statusEl.textContent = '';
+  fetch(API_BASE + '/api/connection-info?key=' + encodeURIComponent(connectionId))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.airtable_base_url) {
+        currentEl.textContent = 'Current: ' + data.airtable_base_url;
+        inputEl.placeholder = data.airtable_base_url;
+      } else {
+        currentEl.textContent = 'No base set.';
+      }
+    })
+    .catch(function () {
+      currentEl.textContent = 'Could not load.';
+    });
 }
 
 function showConnectedState(connectionId) {
@@ -36,8 +43,8 @@ function showConnectedState(connectionId) {
   if (connectionId) {
     setup.hidden = true;
     connected.hidden = false;
-    document.getElementById('key').value = connectionId;
     updateConfigureLink(connectionId);
+    loadConnectionInfo(connectionId);
     loadSharedKeys();
   } else {
     setup.hidden = false;
@@ -122,10 +129,51 @@ if (reconnectEl) reconnectEl.addEventListener('click', function (e) {
   chrome.tabs.create({ url: API_BASE + '/connect' });
 });
 
+document.getElementById('base-url-save').addEventListener('click', function () {
+  var input = document.getElementById('base-url');
+  var status = document.getElementById('base-url-status');
+  var url = (input && input.value || '').trim();
+  if (!url) {
+    status.textContent = 'Enter a base URL to change it.';
+    status.className = 'muted';
+    return;
+  }
+  chrome.storage.sync.get(['connection_id'], function (data) {
+    var connectionId = (data && data.connection_id) ? data.connection_id.trim() : '';
+    if (!connectionId) {
+      status.textContent = 'Not connected.';
+      status.className = 'muted';
+      return;
+    }
+    status.textContent = 'Updating…';
+    status.className = 'muted';
+    fetch(API_BASE + '/api/connection/update-base', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ connection_id: connectionId, airtable_base_url: url })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res.success) {
+          status.textContent = 'Base updated.';
+          status.className = 'saved';
+          document.getElementById('base-url-current').textContent = 'Current: ' + url;
+          input.value = '';
+        } else {
+          status.textContent = res.error || 'Update failed.';
+          status.className = 'muted';
+        }
+      })
+      .catch(function () {
+        status.textContent = 'Request failed.';
+        status.className = 'muted';
+      });
+  });
+});
+
 chrome.storage.sync.get(['connection_id'], function (data) {
   const key = (data && data.connection_id) ? data.connection_id : '';
   if (key) {
-    document.getElementById('key').value = key;
     showConnectedState(key);
   } else {
     showConnectedState('');

@@ -18,13 +18,19 @@
   <h1>Lightspeed → Airtable</h1>
   <div id="setup-block">
     <p>Connect Lightspeed and Airtable once to get started.</p>
-    <button id="get-started">Get connection key</button>
-    <p class="muted" style="margin-top: 1rem;">Or paste a key you already have:</p>
+    <button id="get-started">Get started</button>
   </div>
   <div id="connected-block" hidden>
     <p class="saved">You're connected. Use the Export to Airtable button on any Lightspeed item list page.</p>
     <p id="configure-link" class="muted" style="margin-top: 1rem;"></p>
-    <p class="muted"><a href="#" id="reconnect-link">Reconnect</a> (get a new connection key)</p>
+    <div id="base-url-block" style="margin-top: 1rem;">
+      <label for="base-url">Airtable base</label>
+      <p id="base-url-current" class="muted" style="margin: 0.25rem 0;"></p>
+      <input type="text" id="base-url" placeholder="https://airtable.com/appXXXX...">
+      <button type="button" id="base-url-save">Update base</button>
+      <p id="base-url-status" class="muted" style="margin-top: 0.5rem;"></p>
+    </div>
+    <p class="muted" style="margin-top: 1.25rem;"><a href="#" id="reconnect-link">Reconnect</a> (get a new connection)</p>
     <div id="shared-key-block" style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #eee;">
       <p class="muted" style="margin-bottom: 0.5rem;">Use a shared store key (one Airtable key for the whole store):</p>
       <label for="shared-key-select">Available keys</label>
@@ -37,9 +43,6 @@
       <p id="shared-key-status" class="muted" style="margin-top: 0.5rem;"></p>
     </div>
   </div>
-  <label for="key">Connection key</label>
-  <input type="text" id="key" placeholder="Paste your connection key (UUID)">
-  <button id="save">Save</button>
   <p id="status" class="muted"></p>
   <script src="options.js"></script>
 </body>

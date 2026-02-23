@@ -178,6 +178,20 @@ def _update_connection_airtable_key(conn_id: str, api_key: str) -> None:
         db.commit()
 
 
+def _update_connection_base(conn_id: str, airtable_base_url_or_id: str) -> bool:
+    """Update connection's Airtable base. Returns True if base_id was valid and updated."""
+    base_id = _extract_airtable_base_id(airtable_base_url_or_id)
+    if not base_id:
+        return False
+    with _get_db() as db:
+        db.execute(
+            "UPDATE connections SET airtable_base_id = ? WHERE id = ?",
+            (base_id, conn_id),
+        )
+        db.commit()
+    return True
+
+
 def _get_airtable_key_for_connection(conn_id: str) -> str | None:
     """Resolve Airtable API key: shared key (if unlocked) > connection's key > server env."""
     row = _get_connection(conn_id)
@@ -458,23 +472,22 @@ CONNECT_HTML = """
     <h2>Upload your own API key</h2>
     <p class="muted">Paste your Airtable personal access token and the link to your base. You need your own key; there is no default key.</p>
     <form method="post" action="/connect/start" id="f">
-      <label>Lightspeed Account ID <span class="muted">(find in your Lightspeed URL or settings)</span></label>
-      <input type="text" name="account_id" placeholder="e.g. 12345" required>
-      <label>Link to your Airtable</label>
-      <p class="muted">Open the Airtable where you want exports to go, then copy the URL from your browser and paste it below.</p>
-      <input type="text" name="airtable_base_url" placeholder="Paste the link when your Airtable is open" required>
-      <label>Airtable personal API key <strong>(required)</strong></label>
+      <label>API key <strong>(required)</strong></label>
       <p class="muted">Paste your Airtable token. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create a token</a> if you don't have one.</p>
       <input type="password" name="airtable_api_key" placeholder="Paste your Airtable token (pat...)" required autocomplete="off">
       <details>
         <summary>How to create an Airtable token</summary>
         <p class="muted" style="margin-top: 0.5rem;">Personal access tokens are available on Free, Plus, Pro, and Enterprise plans. Required scopes: <code>data.records:read</code>, <code>data.records:write</code>, <code>schema.bases:read</code>, <code>schema.bases:write</code>. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create a token</a>.</p>
       </details>
-      <p class="muted" style="margin-top: 1rem;"><strong>Share this key with your team?</strong> If you want others at your store to use this same key, give it a <strong>screen name</strong> (e.g. &quot;Store Main&quot;) and a <strong>password</strong>. They will then see it in the &quot;Use an existing store key&quot; dropdown above and unlock it with that password. Optional—leave blank if this key is only for you.</p>
-      <label>Screen name for this key <span class="muted">(optional; e.g. &quot;Store Main&quot;)</span></label>
+      <label>Key label <span class="muted">(optional; e.g. &quot;Store Main&quot;—share with team so they see this name in the dropdown)</span></label>
       <input type="text" name="share_label" placeholder="e.g. Store Main">
-      <label>Password for this key <span class="muted">(optional; team members will enter this to unlock it)</span></label>
+      <label>Key password <span class="muted">(optional; team members enter this to unlock and use this key)</span></label>
       <input type="password" name="share_password" placeholder="Choose a password for your team" autocomplete="new-password">
+      <label>Lightspeed Account ID <span class="muted">(find in your Lightspeed URL or settings)</span></label>
+      <input type="text" name="account_id" placeholder="e.g. 12345" required>
+      <label>Link to your Airtable</label>
+      <p class="muted">Open the Airtable where you want exports to go, then copy the URL from your browser and paste it below.</p>
+      <input type="text" name="airtable_base_url" placeholder="Paste the link when your Airtable is open" required>
       <button type="submit">Continue to Lightspeed authorization</button>
     </form>
   </div>
@@ -949,6 +962,35 @@ def api_shared_keys_unlock(shared_key_id):
     if _unlock_shared_key(shared_key_id, password, connection_id):
         return jsonify({"success": True})
     return jsonify({"success": False, "error": "Wrong password"}), 200
+
+
+@app.route("/api/connection-info", methods=["GET"])
+def api_connection_info():
+    """Return connection info for the extension (e.g. Airtable base URL). Key in query: key=connection_id."""
+    key = (request.args.get("key") or "").strip()
+    if not key:
+        return jsonify({"error": "Missing key"}), 400
+    row = _get_connection(key)
+    if not row:
+        return jsonify({"error": "Connection not found"}), 404
+    base_id = (row["airtable_base_id"] or "").strip()
+    airtable_base_url = f"https://airtable.com/{base_id}" if base_id else ""
+    return jsonify({"connection_id": key, "airtable_base_url": airtable_base_url})
+
+
+@app.route("/api/connection/update-base", methods=["POST"])
+def api_connection_update_base():
+    """Update the Airtable base for a connection. JSON: connection_id, airtable_base_url."""
+    data = request.get_json() or {}
+    connection_id = (data.get("connection_id") or "").strip()
+    airtable_base_url = (data.get("airtable_base_url") or "").strip()
+    if not connection_id or not airtable_base_url:
+        return jsonify({"success": False, "error": "Missing connection_id or airtable_base_url"}), 200
+    if not _get_connection(connection_id):
+        return jsonify({"success": False, "error": "Connection not found"}), 200
+    if _update_connection_base(connection_id, airtable_base_url):
+        return jsonify({"success": True})
+    return jsonify({"success": False, "error": "Invalid Airtable base URL"}), 200
 
 
 @app.route("/settings", methods=["GET", "POST"])

@@ -382,26 +382,15 @@ SUCCESS_HTML = """
   <style>
     body { font-family: system-ui, sans-serif; max-width: 520px; margin: 2rem auto; padding: 0 1rem; }
     h1 { font-size: 1.25rem; color: #080; }
-    .key { font-family: monospace; background: #f0f0f0; padding: 0.75rem; word-break: break-all; margin: 1rem 0; }
-    button { padding: 0.5rem 1rem; background: #06c; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
-    button:hover { background: #05a; }
     .muted { color: #666; font-size: 0.9rem; margin-top: 1rem; }
+    a { color: #06c; }
   </style>
 </head>
 <body>
   <h1>You're all set</h1>
   <p>You've successfully connected Lightspeed and Airtable. The extension has saved your connection—you can close this tab and use <strong>Export to Airtable</strong> on any Lightspeed item list page.</p>
-  <p class="muted"><a href="/settings?key={{ connection_key }}">Configure which fields to export</a></p>
-  <p class="muted">If you ever need to reconnect (new key or different account), open the extension options and click <strong>Reconnect</strong>.</p>
-  <div class="key" id="key" style="margin-top:1rem;">{{ connection_key }}</div>
-  <button type="button" id="copy">Copy key</button>
-  <p class="muted" style="margin-top:0.5rem;">Keep this key private. Anyone with it can export from your Lightspeed to your Airtable.</p>
-  <script>
-    document.getElementById('copy').onclick = function() {
-      navigator.clipboard.writeText(document.getElementById('key').textContent);
-      this.textContent = 'Copied!';
-    };
-  </script>
+  <p><a href="/settings?key={{ connection_key }}">Configure which fields to export</a></p>
+  <p class="muted">Fields to export are the item details that get sent to Airtable when you run an export—for example name, price, cost, vendor, and category. You can change this selection anytime from the link above or in the extension options.</p>
 </body>
 </html>
 """

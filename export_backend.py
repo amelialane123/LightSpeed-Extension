@@ -333,7 +333,7 @@ CONNECT_HTML = """
     <label>Link to your Airtable</label>
     <p class="muted">Open the Airtable where you want exports to go, then copy the URL from your browser's address bar and paste it below.</p>
     <input type="text" name="airtable_base_url" placeholder="Paste the link when your Airtable is open in your browser" required>
-    <button type="submit">Continue to Lightspeed login</button>
+    <button type="submit">Continue to Lightspeed authorization</button>
   </form>
 </body>
 </html>
@@ -389,12 +389,13 @@ SUCCESS_HTML = """
   </style>
 </head>
 <body>
-  <h1>You're connected</h1>
-  <p>Copy this connection key and paste it into the extension options (right‑click the extension icon → Options):</p>
-  <div class="key" id="key">{{ connection_key }}</div>
-  <button type="button" id="copy">Copy key</button>
+  <h1>You're all set</h1>
+  <p>You've successfully connected Lightspeed and Airtable. The extension has saved your connection—you can close this tab and use <strong>Export to Airtable</strong> on any Lightspeed item list page.</p>
   <p class="muted"><a href="/settings?key={{ connection_key }}">Configure which fields to export</a></p>
-  <p class="muted">Keep this key private. Anyone with it can export from your Lightspeed to your Airtable. You can reconnect anytime to create a new key.</p>
+  <p class="muted">If you ever need to reconnect (new key or different account), open the extension options and click <strong>Reconnect</strong>.</p>
+  <div class="key" id="key" style="margin-top:1rem;">{{ connection_key }}</div>
+  <button type="button" id="copy">Copy key</button>
+  <p class="muted" style="margin-top:0.5rem;">Keep this key private. Anyone with it can export from your Lightspeed to your Airtable.</p>
   <script>
     document.getElementById('copy').onclick = function() {
       navigator.clipboard.writeText(document.getElementById('key').textContent);
@@ -489,7 +490,11 @@ def connect_start():
         "airtable_base_id": airtable_base_id,
         "airtable_table_name": airtable_table_name,
     }
-    return redirect(url_for("connect_paste"))
+    auth_url = (
+        f"{ls.AUTHORIZE_URL}?response_type=code&client_id={quote(client_id, safe='')}"
+        f"&scope=employee:all&state={quote(state, safe='')}&redirect_uri={quote(redirect_uri, safe='')}"
+    )
+    return redirect(auth_url)
 
 
 @app.route("/connect/paste", methods=["GET", "POST"])

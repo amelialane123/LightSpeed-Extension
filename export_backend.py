@@ -477,7 +477,24 @@ CONNECT_HTML = """
       <input type="password" name="airtable_api_key" placeholder="Paste your Airtable token (pat...)" required autocomplete="off">
       <details>
         <summary>How to create an Airtable token</summary>
-        <p class="muted" style="margin-top: 0.5rem;">Personal access tokens are available on Free, Plus, Pro, and Enterprise plans. Required scopes: <code>data.records:read</code>, <code>data.records:write</code>, <code>schema.bases:read</code>, <code>schema.bases:write</code>. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create a token</a>.</p>
+        <div class="muted" style="margin-top: 0.75rem;">
+          <p style="margin-bottom: 0.5rem;"><strong>Part 1 — Account and plan</strong></p>
+          <ol class="token-steps" style="margin: 0.25rem 0 0.75rem 1.25rem; padding-left: 0.5rem;">
+            <li>If you don’t have an Airtable account, go to <a href="https://airtable.com" target="_blank" rel="noopener">airtable.com</a> and sign up (free).</li>
+            <li>Create or open a base (spreadsheet) where you want your Lightspeed exports to go.</li>
+            <li>Personal access tokens and all required scopes are available on the <strong>Free</strong> plan. Free supports the same scopes as Plus, Pro, and Enterprise; the main limit is 1,000 API calls per month. If you’re on a team, your admin may need to allow API access in the workspace.</li>
+          </ol>
+          <p style="margin-bottom: 0.5rem;"><strong>Part 2 — Create the token</strong></p>
+          <ol class="token-steps" style="margin: 0.25rem 0 0.75rem 1.25rem; padding-left: 0.5rem;">
+            <li>Open <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Airtable: Create a token</a> (you must be signed in).</li>
+            <li>Click <strong>Create new token</strong>. Give it a name (e.g. “Lightspeed export”).</li>
+            <li>Click <strong>Add a scope</strong>. Add these four scopes (one at a time or as your interface allows):<br>
+              <code>data.records:read</code>, <code>data.records:write</code>, <code>schema.bases:read</code>, <code>schema.bases:write</code>.</li>
+            <li>Click <strong>Add a base</strong>. Choose the base (or “All bases in workspace”) where you want exports to go. The token must have access to the base you’ll paste in “Link to your Airtable” below.</li>
+            <li>Click <strong>Create token</strong>. Copy the token (it starts with <code>pat</code>) and paste it into the API key field above. Keep it private; anyone with the token can access that base.</li>
+          </ol>
+          <p style="margin-top: 0.5rem;">More: <a href="https://airtable.com/developers/web/guides/personal-access-tokens" target="_blank" rel="noopener">Personal access tokens</a> · <a href="https://airtable.com/developers/web/api/scopes" target="_blank" rel="noopener">Scopes reference</a></p>
+        </div>
       </details>
       <label>Key label <span class="muted">(optional; e.g. &quot;Store Main&quot;—share with team so they see this name in the dropdown)</span></label>
       <input type="text" name="share_label" placeholder="e.g. Store Main">
@@ -660,21 +677,23 @@ SETTINGS_HTML = """
     <input type="password" name="airtable_api_key" placeholder="Paste a new Airtable token here" autocomplete="off" style="margin-bottom: 0.25rem;">
     <details>
       <summary>Don't have a token? How to create one</summary>
-      <p class="muted" style="margin-top: 0.5rem;">Your Airtable account must allow API access. Personal access tokens are available on <strong>Free</strong>, <strong>Plus</strong>, <strong>Pro</strong>, and <strong>Enterprise</strong> plans. If you're on a team, your admin may need to enable API access.</p>
-      <p class="muted"><strong>Required scopes</strong> (when creating the token, add these):</p>
-      <ul class="muted token-steps">
-        <li><strong>data.records:read</strong> and <strong>data.records:write</strong> — to create and update records in your base</li>
-        <li><strong>schema.bases:read</strong> and <strong>schema.bases:write</strong> — to create new tables in your base for each export</li>
-      </ul>
-      <p class="muted"><strong>Steps:</strong></p>
-      <ol class="token-steps muted">
-        <li>Go to <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Airtable: Create a token</a> (opens in a new tab).</li>
-        <li>Click <strong>Create new token</strong>. Give it a name (e.g. &quot;Lightspeed export&quot;).</li>
-        <li>Click <strong>Add a scope</strong> and add: <code>data.records:read</code>, <code>data.records:write</code>, <code>schema.bases:read</code>, <code>schema.bases:write</code>.</li>
-        <li>Click <strong>Add a base</strong> and choose the base (or workspace) where you want exports to go.</li>
-        <li>Click <strong>Create token</strong>. Copy the token (starts with <code>pat...</code>) and paste it above. Keep it private.</li>
-      </ol>
-      <p class="muted">More info: <a href="https://airtable.com/developers/web/guides/personal-access-tokens" target="_blank" rel="noopener">Personal access tokens</a> and <a href="https://airtable.com/developers/web/api/scopes" target="_blank" rel="noopener">Scopes reference</a>.</p>
+      <div class="muted" style="margin-top: 0.75rem;">
+        <p style="margin-bottom: 0.5rem;"><strong>Part 1 — Account and plan</strong></p>
+        <ol class="token-steps" style="margin: 0.25rem 0 0.75rem 1.25rem; padding-left: 0.5rem;">
+          <li>If you don’t have an Airtable account, go to <a href="https://airtable.com" target="_blank" rel="noopener">airtable.com</a> and sign up (free).</li>
+          <li>Create or open a base where you want your Lightspeed exports to go.</li>
+          <li>All required scopes work on the <strong>Free</strong> plan (Free has a 1,000 API calls/month limit). On a team, your admin may need to allow API access.</li>
+        </ol>
+        <p style="margin-bottom: 0.5rem;"><strong>Part 2 — Create the token</strong></p>
+        <ol class="token-steps" style="margin: 0.25rem 0 0.75rem 1.25rem; padding-left: 0.5rem;">
+          <li>Open <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Airtable: Create a token</a> (signed in).</li>
+          <li>Click <strong>Create new token</strong> and name it (e.g. “Lightspeed export”).</li>
+          <li>Click <strong>Add a scope</strong> and add: <code>data.records:read</code>, <code>data.records:write</code>, <code>schema.bases:read</code>, <code>schema.bases:write</code>.</li>
+          <li>Click <strong>Add a base</strong> and choose the base (or workspace) for exports.</li>
+          <li>Click <strong>Create token</strong>, copy the token (starts with <code>pat</code>), and paste it above. Keep it private.</li>
+        </ol>
+        <p style="margin-top: 0.5rem;"><a href="https://airtable.com/developers/web/guides/personal-access-tokens" target="_blank" rel="noopener">Personal access tokens</a> · <a href="https://airtable.com/developers/web/api/scopes" target="_blank" rel="noopener">Scopes reference</a></p>
+      </div>
     </details>
     <ul class="field-list">
       {% for f in available_fields %}

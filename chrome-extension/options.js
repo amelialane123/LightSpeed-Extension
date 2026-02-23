@@ -38,11 +38,79 @@ function showConnectedState(connectionId) {
     connected.hidden = false;
     document.getElementById('key').value = connectionId;
     updateConfigureLink(connectionId);
+    loadSharedKeys();
   } else {
     setup.hidden = false;
     connected.hidden = true;
   }
 }
+
+function loadSharedKeys() {
+  const sel = document.getElementById('shared-key-select');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Loading…</option>';
+  fetch(API_BASE + '/api/shared-keys')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      sel.innerHTML = '<option value="">— Choose a key —</option>';
+      (data.shared_keys || []).forEach(function (k) {
+        var opt = document.createElement('option');
+        opt.value = k.id;
+        opt.textContent = k.label || k.id;
+        sel.appendChild(opt);
+      });
+    })
+    .catch(function () {
+      sel.innerHTML = '<option value="">Failed to load</option>';
+    });
+}
+
+document.getElementById('shared-key-unlock').addEventListener('click', function () {
+  var sel = document.getElementById('shared-key-select');
+  var pwd = (document.getElementById('shared-key-password').value || '').trim();
+  var status = document.getElementById('shared-key-status');
+  var id = (sel && sel.value) || '';
+  if (!id) {
+    status.textContent = 'Choose a key from the list.';
+    status.className = 'muted';
+    return;
+  }
+  if (!pwd) {
+    status.textContent = 'Enter the password for this key.';
+    status.className = 'muted';
+    return;
+  }
+  chrome.storage.sync.get(['connection_id'], function (data) {
+    var connectionId = (data && data.connection_id) ? data.connection_id.trim() : '';
+    if (!connectionId) {
+      status.textContent = 'Save your connection key first.';
+      status.className = 'muted';
+      return;
+    }
+    status.textContent = 'Unlocking…';
+    status.className = 'muted';
+    fetch(API_BASE + '/api/shared-keys/' + encodeURIComponent(id) + '/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pwd, connection_id: connectionId })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res.success) {
+          status.textContent = 'Unlocked. Exports will use this store key.';
+          status.className = 'saved';
+          document.getElementById('shared-key-password').value = '';
+        } else {
+          status.textContent = res.error || 'Unlock failed.';
+          status.className = 'muted';
+        }
+      })
+      .catch(function () {
+        status.textContent = 'Request failed.';
+        status.className = 'muted';
+      });
+  });
+});
 
 document.getElementById('get-started').onclick = function () {
   chrome.tabs.create({ url: API_BASE + '/connect' });

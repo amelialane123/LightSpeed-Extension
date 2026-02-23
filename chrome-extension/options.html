@@ -25,6 +25,17 @@
     <p class="saved">You're connected. Use the Export to Airtable button on any Lightspeed item list page.</p>
     <p id="configure-link" class="muted" style="margin-top: 1rem;"></p>
     <p class="muted"><a href="#" id="reconnect-link">Reconnect</a> (get a new connection key)</p>
+    <div id="shared-key-block" style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #eee;">
+      <p class="muted" style="margin-bottom: 0.5rem;">Use a shared store key (one Airtable key for the whole store):</p>
+      <label for="shared-key-select">Available keys</label>
+      <select id="shared-key-select">
+        <option value="">— Load list —</option>
+      </select>
+      <label for="shared-key-password" style="margin-top: 0.5rem;">Password for selected key</label>
+      <input type="password" id="shared-key-password" placeholder="Enter password" autocomplete="off">
+      <button type="button" id="shared-key-unlock">Unlock and use this key</button>
+      <p id="shared-key-status" class="muted" style="margin-top: 0.5rem;"></p>
+    </div>
   </div>
   <label for="key">Connection key</label>
   <input type="text" id="key" placeholder="Paste your connection key (UUID)">

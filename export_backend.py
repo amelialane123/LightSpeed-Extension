@@ -315,8 +315,8 @@ CONNECT_HTML = """
     <label>Lightspeed Account ID <span class="muted">(find in your Lightspeed URL or settings)</span></label>
     <input type="text" name="account_id" placeholder="e.g. 12345" required>
     <label>Link to your Airtable</label>
+    <p class="muted">Open the Airtable where you want exports to go, then copy the URL from your browser's address bar and paste it below.</p>
     <input type="text" name="airtable_base_url" placeholder="Paste the link when your Airtable is open in your browser" required>
-    <p class="muted">Open the Airtable where you want exports to go, then copy the URL from your browser's address bar and paste it here.</p>
     <button type="submit">Continue to Lightspeed login</button>
   </form>
 </body>

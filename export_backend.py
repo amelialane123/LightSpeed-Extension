@@ -310,12 +310,13 @@ CONNECT_HTML = """
 <body>
   <h1>Connect your Lightspeed & Airtable</h1>
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
-  <p>Enter your details below, then continue to sign in with Lightspeed. You only need to do this once. The server uses one Airtable API key; you choose your own base. Exports create new tables in that base (or use the default table if you change settings later).</p>
+  <p>Enter your details below, then continue to sign in with Lightspeed. You only need to do this once. Exports will create new tables in the Airtable you link below.</p>
   <form method="post" action="/connect/start" id="f">
     <label>Lightspeed Account ID <span class="muted">(find in your Lightspeed URL or settings)</span></label>
     <input type="text" name="account_id" placeholder="e.g. 12345" required>
-    <label>Airtable base URL</label>
-    <input type="text" name="airtable_base_url" placeholder="Paste your Airtable base URL (e.g. https://airtable.com/appXXX...)" required>
+    <label>Link to your Airtable</label>
+    <input type="text" name="airtable_base_url" placeholder="Paste the link when your Airtable is open in your browser" required>
+    <p class="muted">Open the Airtable where you want exports to go, then copy the URL from your browser's address bar and paste it here.</p>
     <button type="submit">Continue to Lightspeed login</button>
   </form>
   <p class="muted">Set <code>LIGHTSPEED_REDIRECT_URI</code> in .env to an HTTPS URL (e.g. Postman callback). You'll paste the redirect URL back here after authorizing.</p>
@@ -458,7 +459,7 @@ def connect_start():
     if not account_id or not airtable_base_id:
         return render_template_string(
             CONNECT_HTML,
-            error="Please fill in Account ID and paste your Airtable base URL (we'll use the base from it).",
+            error="Please fill in Account ID and paste the link to your Airtable.",
         )
     client_id = ls.env("LIGHTSPEED_CLIENT_ID")
     client_secret = ls.env("LIGHTSPEED_CLIENT_SECRET")

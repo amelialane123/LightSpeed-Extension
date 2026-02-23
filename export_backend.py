@@ -221,6 +221,7 @@ def api_run():
         "AIRTABLE_API_KEY": airtable_key,
         "AIRTABLE_BASE_ID": row["airtable_base_id"],
         "AIRTABLE_TABLE_NAME": row["airtable_table_name"],
+        "AIRTABLE_CREATE_NEW_TABLE": "1",  # create a new table per export; push uses table ID (avoids 403 on missing "Items")
         "AIRTABLE_FIELDS": ",".join(selected),
         "FROM_EXPORT_BACKEND": "1",  # script skips opening browser; extension opens the tab
     }

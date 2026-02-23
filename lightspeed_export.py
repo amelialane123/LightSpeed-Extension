@@ -34,7 +34,17 @@ REFRESH_URL = "https://cloud.lightspeedapp.com/auth/oauth/token"
 LOCAL_CALLBACK_PORT = 8765
 LOCAL_REDIRECT_URI = f"http://127.0.0.1:{LOCAL_CALLBACK_PORT}/callback"
 LIMIT = 100  # API max per request
-RATE_DELAY_SEC = 0.15  # delay between Lightspeed requests (stay under bucket limit)
+
+
+def _rate_delay_sec() -> float:
+    """Delay between Lightspeed API requests. Set EXPORT_LIGHTSPEED_DELAY in env to override (e.g. 0.15 if you get 429)."""
+    raw = env("EXPORT_LIGHTSPEED_DELAY", "")
+    if raw:
+        try:
+            return max(0.05, float(raw))
+        except ValueError:
+            pass
+    return 0.1
 
 
 def env(key: str, default: str = "") -> str:
@@ -331,7 +341,7 @@ def fetch_all_paginated(
         url = next_url
         params = {}  # next URL has everything
 
-        time.sleep(RATE_DELAY_SEC)
+        time.sleep(_rate_delay_sec())
         if page % 50 == 0:
             print(f"  ... fetched {len(all_records)} {resource} records so far", file=sys.stderr)
 
@@ -814,7 +824,17 @@ def _build_table_schema(field_ids: list[str] | None = None) -> list[dict]:
 AIRTABLE_API_BASE = "https://api.airtable.com/v0"
 AIRTABLE_META_BASE = "https://api.airtable.com/v0/meta"
 AIRTABLE_BATCH_SIZE = 10  # max records per create request
-AIRTABLE_RATE_DELAY = 0.2  # 5 req/sec per base (Airtable limit)
+
+
+def _airtable_rate_delay() -> float:
+    """Delay between Airtable batch requests. Airtable allows 5 req/sec; 0.18 is slightly faster, 0.2 is safe."""
+    raw = env("EXPORT_AIRTABLE_DELAY", "")
+    if raw:
+        try:
+            return max(0.15, float(raw))
+        except ValueError:
+            pass
+    return 0.18
 
 
 def _sanitize_table_name(name: str) -> str:
@@ -920,7 +940,7 @@ def push_to_airtable(
         total += len(batch)
         if total % 500 == 0 or total == len(rows):
             print(f"  Pushed {total}/{len(rows)} records to Airtable.", file=sys.stderr)
-        time.sleep(AIRTABLE_RATE_DELAY)
+        time.sleep(_airtable_rate_delay())
     print(f"Pushed {total} records to Airtable.", file=sys.stderr)
 
 

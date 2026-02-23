@@ -268,6 +268,28 @@ def _oauth_redirect_uri() -> str:
     return request.url_root.rstrip("/") + "/connect/callback"
 
 
+def _extract_airtable_base_id(value: str) -> str | None:
+    """Extract Airtable base ID from a full URL or return the value if it's already a base ID."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    # Already looks like a base ID (app + alphanumeric)
+    if value.startswith("app") and len(value) >= 14 and value[3:].replace("_", "").isalnum():
+        return value
+    # Try to parse as URL (e.g. https://airtable.com/appXXX/... or https://airtable.com/appXXX)
+    if "airtable.com" in value:
+        try:
+            parsed = urlparse(value if "://" in value else "https://" + value)
+            path = (parsed.path or "").strip("/")
+            segments = [s for s in path.split("/") if s]
+            for seg in segments:
+                if seg.startswith("app") and len(seg) >= 14:
+                    return seg
+        except Exception:
+            pass
+    return None
+
+
 CONNECT_HTML = """
 <!DOCTYPE html>
 <html>
@@ -292,8 +314,8 @@ CONNECT_HTML = """
   <form method="post" action="/connect/start" id="f">
     <label>Lightspeed Account ID <span class="muted">(find in your Lightspeed URL or settings)</span></label>
     <input type="text" name="account_id" placeholder="e.g. 12345" required>
-    <label>Airtable Base ID</label>
-    <input type="text" name="airtable_base_id" placeholder="appXXXXXXXXXXXXXX" required>
+    <label>Airtable base URL</label>
+    <input type="text" name="airtable_base_url" placeholder="Paste your Airtable base URL (e.g. https://airtable.com/appXXX...)" required>
     <button type="submit">Continue to Lightspeed login</button>
   </form>
   <p class="muted">Set <code>LIGHTSPEED_REDIRECT_URI</code> in .env to an HTTPS URL (e.g. Postman callback). You'll paste the redirect URL back here after authorizing.</p>
@@ -428,12 +450,15 @@ def connect_page():
 @app.route("/connect/start", methods=["POST"])
 def connect_start():
     account_id = (request.form.get("account_id") or "").strip()
-    airtable_base_id = (request.form.get("airtable_base_id") or "").strip()
+    airtable_input = (
+        (request.form.get("airtable_base_url") or request.form.get("airtable_base_id") or "").strip()
+    )
+    airtable_base_id = _extract_airtable_base_id(airtable_input)
     airtable_table_name = (request.form.get("airtable_table_name") or "").strip() or "Items"
     if not account_id or not airtable_base_id:
         return render_template_string(
             CONNECT_HTML,
-            error="Please fill in Account ID and Base ID.",
+            error="Please fill in Account ID and paste your Airtable base URL (we'll use the base from it).",
         )
     client_id = ls.env("LIGHTSPEED_CLIENT_ID")
     client_secret = ls.env("LIGHTSPEED_CLIENT_SECRET")

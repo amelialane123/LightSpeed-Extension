@@ -288,14 +288,12 @@ CONNECT_HTML = """
 <body>
   <h1>Connect your Lightspeed & Airtable</h1>
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
-  <p>Enter your details below, then continue to sign in with Lightspeed. You only need to do this once. The server uses one Airtable API key; you choose your own base and table.</p>
+  <p>Enter your details below, then continue to sign in with Lightspeed. You only need to do this once. The server uses one Airtable API key; you choose your own base. Exports create new tables in that base (or use the default table if you change settings later).</p>
   <form method="post" action="/connect/start" id="f">
     <label>Lightspeed Account ID <span class="muted">(find in your Lightspeed URL or settings)</span></label>
     <input type="text" name="account_id" placeholder="e.g. 12345" required>
     <label>Airtable Base ID</label>
     <input type="text" name="airtable_base_id" placeholder="appXXXXXXXXXXXXXX" required>
-    <label>Airtable Table name or ID</label>
-    <input type="text" name="airtable_table_name" placeholder="e.g. Current Home or tblXXX" required>
     <button type="submit">Continue to Lightspeed login</button>
   </form>
   <p class="muted">Set <code>LIGHTSPEED_REDIRECT_URI</code> in .env to an HTTPS URL (e.g. Postman callback). You'll paste the redirect URL back here after authorizing.</p>
@@ -431,11 +429,11 @@ def connect_page():
 def connect_start():
     account_id = (request.form.get("account_id") or "").strip()
     airtable_base_id = (request.form.get("airtable_base_id") or "").strip()
-    airtable_table_name = (request.form.get("airtable_table_name") or "").strip()
-    if not account_id or not airtable_base_id or not airtable_table_name:
+    airtable_table_name = (request.form.get("airtable_table_name") or "").strip() or "Items"
+    if not account_id or not airtable_base_id:
         return render_template_string(
             CONNECT_HTML,
-            error="Please fill in all fields.",
+            error="Please fill in Account ID and Base ID.",
         )
     client_id = ls.env("LIGHTSPEED_CLIENT_ID")
     client_secret = ls.env("LIGHTSPEED_CLIENT_SECRET")

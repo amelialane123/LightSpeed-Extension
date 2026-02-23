@@ -1,7 +1,7 @@
 'use strict';
 
-// Must match API_BASE in background.js; update both when deploying
-const API_BASE = 'http://127.0.0.1:5050';
+// Must match API_BASE in background.js (your deployed backend URL, no trailing slash)
+const API_BASE = 'https://lightspeed-extension-production.up.railway.app';
 
 document.getElementById('save').onclick = function () {
   const key = (document.getElementById('key').value || '').trim();

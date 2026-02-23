@@ -1,7 +1,7 @@
 'use strict';
 
-// Set this to your deployed backend URL, e.g. 'https://your-app.railway.app'
-const API_BASE = 'http://127.0.0.1:5050';
+// Set to your deployed backend URL (no trailing slash)
+const API_BASE = 'https://lightspeed-extension-production.up.railway.app';
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.action !== 'runExport') {

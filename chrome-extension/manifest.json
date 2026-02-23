@@ -2,26 +2,18 @@
   "manifest_version": 3,
   "name": "Lightspeed → Airtable",
   "version": "1.0",
-  "description": "Export the current Lightspeed category (or all) to Airtable. Run the export backend first (python export_backend.py).",
+  "description": "Export the current Lightspeed category (or all) to Airtable.",
   "permissions": ["activeTab", "storage"],
   "background": {"service_worker": "background.js"},
   "host_permissions": [
     "https://*.lightspeedapp.com/*",
     "https://*.merchantos.com/*",
-    "http://127.0.0.1:5050/*"
+    "http://127.0.0.1:5050/*",
+    "https://lightspeed-extension-production.up.railway.app/*"
   ],
-  "options_ui": {
-    "page": "options.html"
-  },
+  "options_ui": {"page": "options.html"},
   "content_scripts": [
-    {
-      "matches": [
-        "https://*.lightspeedapp.com/*",
-        "https://*.merchantos.com/*"
-      ],
-      "js": ["content.js"],
-      "css": ["content.css"],
-      "run_at": "document_idle"
-    }
+    {"matches": ["https://*.lightspeedapp.com/*", "https://*.merchantos.com/*"], "js": ["content.js"], "css": ["content.css"], "run_at": "document_idle"},
+    {"matches": ["https://lightspeed-extension-production.up.railway.app/connect/success*"], "js": ["connect-success.js"], "run_at": "document_idle"}
   ]
 }

@@ -1,6 +1,42 @@
 # Lightspeed R-Series → Airtable Export
 
-Export all items from **Lightspeed Retail (R-Series)** (name, cost, price, vendor, SKUs, and optional images) into **JSON** and **CSV** suitable for importing into Airtable or other tools. Built for large catalogs: **pagination** is handled automatically (e.g. 18,000+ items).
+Export items from **Lightspeed Retail (R-Series)** to **Airtable**—via a Chrome extension (one-click from Lightspeed) or the Python script. Supports large catalogs with automatic pagination.
+
+---
+
+## Install the extension (recommended)
+
+Use the extension to export from Lightspeed with one click. You only need to connect once.
+
+### 1. Get a connection key
+
+1. Open **[https://lightspeed-extension-production.up.railway.app/connect](https://lightspeed-extension-production.up.railway.app/connect)** in your browser.
+2. Enter your **Lightspeed Account ID** and paste the **link to your Airtable** (open your Airtable in the browser and copy the URL from the address bar).
+3. Click **Continue to Lightspeed login**, sign in, and complete the flow.
+4. Copy the **connection key** shown on the success page (keep it private).
+
+### 2. Install the extension in Chrome
+
+1. **Download the extension:** Clone or download this repo, or [download the zip](https://github.com/amelialane123/LightSpeed-Extension/archive/refs/heads/main.zip) and unzip it.
+2. Open **Chrome** and go to `chrome://extensions`.
+3. Turn on **Developer mode** (top right).
+4. Click **Load unpacked** and select the **`chrome-extension`** folder inside the project (the folder that contains `manifest.json`).
+5. The extension is now installed.
+
+### 3. Add your connection key
+
+1. Right‑click the extension icon → **Options** (or go to `chrome://extensions`, find the extension, and click **Details** → **Extension options**).
+2. Paste your **connection key** and click **Save**.
+
+### 4. Export
+
+1. In Lightspeed, go to **Inventory → Items** (or any item search/list view).
+2. Click **Export to Airtable** in the page.
+3. Choose a category if prompted (or export all). The export runs on the server; when it finishes, a new tab opens with your Airtable table.
+
+You can change which fields are exported at **[https://lightspeed-extension-production.up.railway.app/settings?key=YOUR_KEY](https://lightspeed-extension-production.up.railway.app/settings)** (replace `YOUR_KEY` with your connection key, or use the “Configure which fields to export” link in the extension options).
+
+---
 
 ## Project layout
 

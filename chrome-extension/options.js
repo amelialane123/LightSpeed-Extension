@@ -15,6 +15,7 @@ document.getElementById('save').onclick = function () {
     status.textContent = 'Saved. You can use the Export to Airtable button on Lightspeed.';
     status.className = 'saved';
     updateConfigureLink(key);
+    showConnectedState(key);
   });
 };
 
@@ -28,9 +29,37 @@ function updateConfigureLink(connectionId) {
   }
 }
 
-chrome.storage.sync.get(['connection_id'], function (data) {
-  if (data.connection_id) {
-    document.getElementById('key').value = data.connection_id;
+function showConnectedState(connectionId) {
+  const setup = document.getElementById('setup-block');
+  const connected = document.getElementById('connected-block');
+  if (!setup || !connected) return;
+  if (connectionId) {
+    setup.hidden = true;
+    connected.hidden = false;
+    document.getElementById('key').value = connectionId;
+    updateConfigureLink(connectionId);
+  } else {
+    setup.hidden = false;
+    connected.hidden = true;
   }
-  updateConfigureLink(data.connection_id || '');
+}
+
+document.getElementById('get-started').onclick = function () {
+  chrome.tabs.create({ url: API_BASE + '/connect' });
+};
+
+var reconnectEl = document.getElementById('reconnect-link');
+if (reconnectEl) reconnectEl.addEventListener('click', function (e) {
+  e.preventDefault();
+  chrome.tabs.create({ url: API_BASE + '/connect' });
+});
+
+chrome.storage.sync.get(['connection_id'], function (data) {
+  const key = (data && data.connection_id) ? data.connection_id : '';
+  if (key) {
+    document.getElementById('key').value = key;
+    showConnectedState(key);
+  } else {
+    showConnectedState('');
+  }
 });

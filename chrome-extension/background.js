@@ -3,7 +3,24 @@
 // Set to your deployed backend URL (no trailing slash)
 const API_BASE = 'https://lightspeed-extension-production.up.railway.app';
 
+chrome.runtime.onInstalled.addListener(function (details) {
+  if (details.reason === 'install') {
+    chrome.tabs.create({ url: API_BASE + '/connect' });
+  }
+});
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.action === 'saveConnectionKey') {
+    const key = (msg.connection_id || '').trim();
+    if (!key) {
+      sendResponse({ ok: false });
+      return true;
+    }
+    chrome.storage.sync.set({ connection_id: key }, function () {
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
   if (msg.action !== 'runExport') {
     sendResponse({ ok: false, error: 'Unknown action' });
     return true;
@@ -22,6 +39,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       .then(function (data) {
         if (data.success && data.airtable_url) {
           chrome.tabs.create({ url: data.airtable_url });
+        } else if (data.error && (data.error.includes('Reconnect') || data.error.includes('Connection not found') || data.error.includes('Missing connection_id'))) {
+          chrome.tabs.create({ url: API_BASE + '/connect' });
         }
         sendResponse({ ok: data.success, error: data.error, output: data.output });
       })

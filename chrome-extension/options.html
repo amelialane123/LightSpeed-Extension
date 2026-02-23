@@ -16,13 +16,20 @@
 </head>
 <body>
   <h1>Lightspeed → Airtable</h1>
-  <p>Paste the connection key you received after connecting at the backend’s <strong>/connect</strong> page.</p>
+  <div id="setup-block">
+    <p>Connect Lightspeed and Airtable once to get started.</p>
+    <button id="get-started">Get connection key</button>
+    <p class="muted" style="margin-top: 1rem;">Or paste a key you already have:</p>
+  </div>
+  <div id="connected-block" hidden>
+    <p class="saved">You're connected. Use the Export to Airtable button on any Lightspeed item list page.</p>
+    <p id="configure-link" class="muted" style="margin-top: 1rem;"></p>
+    <p class="muted"><a href="#" id="reconnect-link">Reconnect</a> (get a new connection key)</p>
+  </div>
   <label for="key">Connection key</label>
   <input type="text" id="key" placeholder="Paste your connection key (UUID)">
   <button id="save">Save</button>
   <p id="status" class="muted"></p>
-  <p id="configure-link" class="muted" style="margin-top: 1rem;"></p>
-  <p class="muted">Don’t have a key? Open your backend URL (e.g. https://your-backend.com/connect), connect Lightspeed and Airtable once, then copy the key here.</p>
   <script src="options.js"></script>
 </body>
 </html>

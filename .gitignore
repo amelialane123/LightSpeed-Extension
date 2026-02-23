@@ -1,0 +1,48 @@
+# Environment and secrets (never commit these)
+.env
+*.env
+!config.example.env
+
+# Local DB with connection tokens
+connections.db
+*.db
+
+# Output
+output/*.csv
+output/*.json
+!output/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store

@@ -1,0 +1,33 @@
+'use strict';
+
+// Set this to your deployed backend URL, e.g. 'https://your-app.railway.app'
+const API_BASE = 'http://127.0.0.1:5050';
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg.action !== 'runExport') {
+    sendResponse({ ok: false, error: 'Unknown action' });
+    return true;
+  }
+  const categoryId = msg.categoryId || 'ALL';
+  chrome.storage.sync.get(['connection_id'], function (data) {
+    const connectionId = (data && data.connection_id) ? data.connection_id.trim() : '';
+    const body = { category_id: categoryId };
+    if (connectionId) body.connection_id = connectionId;
+    fetch(API_BASE + '/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.success && data.airtable_url) {
+          chrome.tabs.create({ url: data.airtable_url });
+        }
+        sendResponse({ ok: data.success, error: data.error, output: data.output });
+      })
+      .catch(function () {
+        sendResponse({ ok: false, error: 'Could not reach export backend. Check that it is running and that API_BASE in the extension is correct.' });
+      });
+  });
+  return true;
+});

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lightspeed-to-airtable"
+version = "0.1.0"
+description = "Export Lightspeed Retail R-Series items to Airtable-ready JSON/CSV with pagination and OAuth refresh."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.28.0",
+    "python-dotenv>=1.0.0",
+    "flask>=2.0.0",
+]
+
+[project.scripts]
+lightspeed-export = "lightspeed_export:main"
+
+[tool.setuptools]
+py-modules = ["lightspeed_export"]

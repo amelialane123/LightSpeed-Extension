@@ -1,0 +1,26 @@
+#ls-airtable-export-wrap {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 2147483647;
+}
+
+#ls-airtable-export-btn {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  background: #0a0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+#ls-airtable-export-btn:hover {
+  background: #080;
+}
+
+#ls-airtable-export-btn:active {
+  transform: scale(0.98);
+}

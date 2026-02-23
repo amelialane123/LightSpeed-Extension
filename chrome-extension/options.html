@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Lightspeed → Airtable – Options</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    label { display: block; margin-top: 0.75rem; }
+    input { width: 100%; padding: 0.5rem; margin: 0.25rem 0; box-sizing: border-box; }
+    button { padding: 0.5rem 1rem; background: #0a0; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-top: 0.5rem; }
+    button:hover { background: #080; }
+    .muted { color: #666; font-size: 0.9rem; }
+    .saved { color: #080; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Lightspeed → Airtable</h1>
+  <p>Paste the connection key you received after connecting at the backend’s <strong>/connect</strong> page.</p>
+  <label for="key">Connection key</label>
+  <input type="text" id="key" placeholder="Paste your connection key (UUID)">
+  <button id="save">Save</button>
+  <p id="status" class="muted"></p>
+  <p id="configure-link" class="muted" style="margin-top: 1rem;"></p>
+  <p class="muted">Don’t have a key? Open your backend URL (e.g. https://your-backend.com/connect), connect Lightspeed and Airtable once, then copy the key here.</p>
+  <script src="options.js"></script>
+</body>
+</html>

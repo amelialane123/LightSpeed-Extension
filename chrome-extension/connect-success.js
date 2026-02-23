@@ -10,7 +10,7 @@
     const notice = document.createElement('p');
     notice.className = 'saved';
     notice.style.cssText = 'color:#080;font-weight:bold;margin-top:1rem;';
-    notice.textContent = 'Key saved to extension. You can close this tab and use Export to Airtable on Lightspeed.';
+    notice.textContent = 'Key saved to extension. You can close this tab and use Export to Airtable on any Lightspeed item list page.';
     document.body.appendChild(notice);
   });
 })();

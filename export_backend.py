@@ -388,7 +388,7 @@ SUCCESS_HTML = """
 </head>
 <body>
   <h1>You're all set</h1>
-  <p>You've successfully connected Lightspeed and Airtable. The extension has saved your connection—you can close this tab and use <strong>Export to Airtable</strong> on any Lightspeed item list page.</p>
+  <p>You've successfully connected Lightspeed and Airtable. The extension has saved your connection.</p>
   <p><a href="/settings?key={{ connection_key }}">Configure which fields to export</a></p>
   <p class="muted">Fields to export are the item details that get sent to Airtable when you run an export—for example name, price, cost, vendor, and category. You can change this selection anytime from the link above or in the extension options.</p>
 </body>

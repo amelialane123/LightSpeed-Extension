@@ -311,7 +311,7 @@ def api_run():
         return jsonify({"success": False, "error": "Server misconfigured (missing client credentials)."}), 200
     airtable_key = _get_airtable_key_for_connection(connection_id)
     if not airtable_key:
-        return jsonify({"success": False, "error": "No Airtable API key. Use your own key in settings, unlock a shared store key, or set AIRTABLE_API_KEY in .env."}), 200
+        return jsonify({"success": False, "error": "No Airtable API key. Use an existing store key or upload your own when you connect, or add your key in extension settings."}), 200
     selected = _get_selected_fields(connection_id)
     env = {
         **os.environ,
@@ -432,31 +432,11 @@ CONNECT_HTML = """
 <body>
   <h1>Connect your Lightspeed & Airtable</h1>
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
-  <p class="muted">Choose how you want to connect. You only need to do this once. Exports will create new tables in the Airtable base you link.</p>
+  <p class="muted">You must use an Airtable API key to connect. Choose one: <strong>use an existing store key</strong> (from the dropdown) or <strong>upload your own</strong> key. You only need to do this once. Exports will create new tables in the Airtable base you link.</p>
 
   <div class="connect-option">
-    <h2>Connect with your own API key</h2>
-    <p class="muted">Use your own Airtable base and optional personal API key. Add your Lightspeed account and Airtable base below.</p>
-    <form method="post" action="/connect/start" id="f">
-      <label>Lightspeed Account ID <span class="muted">(find in your Lightspeed URL or settings)</span></label>
-      <input type="text" name="account_id" placeholder="e.g. 12345" required>
-      <label>Link to your Airtable</label>
-      <p class="muted">Open the Airtable where you want exports to go, then copy the URL from your browser and paste it below.</p>
-      <input type="text" name="airtable_base_url" placeholder="Paste the link when your Airtable is open" required>
-      <label>Airtable personal API key <span class="muted">(optional)</span></label>
-      <p class="muted">Leave blank to use the default. Add your own token if your base is in a different workspace.</p>
-      <input type="password" name="airtable_api_key" placeholder="Optional: paste your Airtable token" autocomplete="off">
-      <details>
-        <summary>Don't have a token? How to create one</summary>
-        <p class="muted" style="margin-top: 0.5rem;">Personal access tokens are available on Free, Plus, Pro, and Enterprise plans. Required scopes: <code>data.records:read</code>, <code>data.records:write</code>, <code>schema.bases:read</code>, <code>schema.bases:write</code>. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create a token</a>.</p>
-      </details>
-      <button type="submit">Continue to Lightspeed authorization</button>
-    </form>
-  </div>
-
-  <div class="connect-option">
-    <h2>Select from existing store keys</h2>
-    <p class="muted">Your store already set up a shared Airtable key. Pick it below, enter the password your team gave you, then add your Lightspeed account and Airtable base on the next step.</p>
+    <h2>Use an existing store key</h2>
+    <p class="muted">Your store already set up a shared Airtable key. Pick it from the dropdown, enter the password your team gave you, then on the next step add your Lightspeed account and Airtable base.</p>
     <form method="post" action="/connect/verify-shared-key">
       <label>Store key</label>
       <select name="shared_key_id" required>
@@ -466,7 +446,7 @@ CONNECT_HTML = """
         {% endfor %}
       </select>
       {% if not shared_keys %}
-      <p class="muted">No store keys available yet. Ask your admin to <a href="/shared-keys/create">create one</a>, or use &quot;Connect with your own API key&quot; above.</p>
+      <p class="muted">No store keys available yet. Someone with an API key needs to upload one (see below) and give it a name and password, or <a href="/shared-keys/create">create a shared key here</a>.</p>
       {% endif %}
       <label>Password for this key</label>
       <input type="password" name="password" placeholder="Enter the password from your team" required autocomplete="off">
@@ -474,7 +454,32 @@ CONNECT_HTML = """
     </form>
   </div>
 
-  <p class="muted" style="margin-top: 1.5rem;">Store admin? <a href="/shared-keys/create">Create a shared store key</a> so your team can select it and unlock with a password.</p>
+  <div class="connect-option">
+    <h2>Upload your own API key</h2>
+    <p class="muted">Paste your Airtable personal access token and the link to your base. You need your own key; there is no default key.</p>
+    <form method="post" action="/connect/start" id="f">
+      <label>Lightspeed Account ID <span class="muted">(find in your Lightspeed URL or settings)</span></label>
+      <input type="text" name="account_id" placeholder="e.g. 12345" required>
+      <label>Link to your Airtable</label>
+      <p class="muted">Open the Airtable where you want exports to go, then copy the URL from your browser and paste it below.</p>
+      <input type="text" name="airtable_base_url" placeholder="Paste the link when your Airtable is open" required>
+      <label>Airtable personal API key <strong>(required)</strong></label>
+      <p class="muted">Paste your Airtable token. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create a token</a> if you don't have one.</p>
+      <input type="password" name="airtable_api_key" placeholder="Paste your Airtable token (pat...)" required autocomplete="off">
+      <details>
+        <summary>How to create an Airtable token</summary>
+        <p class="muted" style="margin-top: 0.5rem;">Personal access tokens are available on Free, Plus, Pro, and Enterprise plans. Required scopes: <code>data.records:read</code>, <code>data.records:write</code>, <code>schema.bases:read</code>, <code>schema.bases:write</code>. <a href="https://airtable.com/create/tokens" target="_blank" rel="noopener">Create a token</a>.</p>
+      </details>
+      <p class="muted" style="margin-top: 1rem;"><strong>Share this key with your team?</strong> If you want others at your store to use this same key, give it a <strong>screen name</strong> (e.g. &quot;Store Main&quot;) and a <strong>password</strong>. They will then see it in the &quot;Use an existing store key&quot; dropdown above and unlock it with that password. Optional—leave blank if this key is only for you.</p>
+      <label>Screen name for this key <span class="muted">(optional; e.g. &quot;Store Main&quot;)</span></label>
+      <input type="text" name="share_label" placeholder="e.g. Store Main">
+      <label>Password for this key <span class="muted">(optional; team members will enter this to unlock it)</span></label>
+      <input type="password" name="share_password" placeholder="Choose a password for your team" autocomplete="new-password">
+      <button type="submit">Continue to Lightspeed authorization</button>
+    </form>
+  </div>
+
+  <p class="muted" style="margin-top: 1.5rem;">To create a shared key without connecting (e.g. for someone else to upload the key): <a href="/shared-keys/create">Create a shared store key</a>.</p>
 </body>
 </html>
 """
@@ -736,6 +741,15 @@ def connect_start():
             shared_keys=shared_keys,
             error="Please fill in Account ID and paste the link to your Airtable.",
         )
+    airtable_api_key = (request.form.get("airtable_api_key") or "").strip()
+    shared_key_pending = session.pop("shared_key_pending", None)
+    if not shared_key_pending and not airtable_api_key:
+        shared_keys = _list_shared_keys()
+        return render_template_string(
+            CONNECT_HTML,
+            shared_keys=shared_keys,
+            error="Provide your Airtable API key: use an existing store key from the dropdown above, or paste your own token in the “Upload your own API key” section.",
+        )
     client_id = ls.env("LIGHTSPEED_CLIENT_ID")
     client_secret = ls.env("LIGHTSPEED_CLIENT_SECRET")
     if not client_id or not client_secret:
@@ -743,8 +757,8 @@ def connect_start():
         return render_template_string(CONNECT_HTML, shared_keys=shared_keys, error="Server missing Lightspeed client credentials.")
     redirect_uri = _oauth_redirect_uri()
     state = secrets.token_urlsafe(24)
-    airtable_api_key = (request.form.get("airtable_api_key") or "").strip()
-    shared_key_pending = session.pop("shared_key_pending", None)
+    share_label = (request.form.get("share_label") or "").strip()
+    share_password = request.form.get("share_password") or ""
     pending_connect = {
         "state": state,
         "redirect_uri": redirect_uri,
@@ -757,6 +771,12 @@ def connect_start():
         pending_connect["shared_key_id"] = shared_key_pending["shared_key_id"]
         pending_connect["shared_key_password"] = shared_key_pending.get("shared_key_password", "")
         pending_connect["airtable_api_key"] = ""  # use shared key after link
+    if airtable_api_key and share_label and share_password:
+        pending_connect["create_shared_key_after_connect"] = {
+            "label": share_label,
+            "password": share_password,
+            "api_key": airtable_api_key,
+        }
     session["pending_connect"] = pending_connect
     auth_url = (
         f"{ls.AUTHORIZE_URL}?response_type=code&client_id={quote(client_id, safe='')}"
@@ -817,6 +837,10 @@ def connect_paste():
     )
     if pending.get("shared_key_id") and pending.get("shared_key_password"):
         _unlock_shared_key(pending["shared_key_id"], pending["shared_key_password"], conn_id)
+    create_after = pending.get("create_shared_key_after_connect")
+    if create_after and create_after.get("label") and create_after.get("password") and create_after.get("api_key"):
+        sk_id = _create_shared_key(create_after["label"], create_after["password"], create_after["api_key"])
+        _unlock_shared_key(sk_id, create_after["password"], conn_id)
     session.pop("pending_connect", None)
     return redirect(url_for("connect_success", key=conn_id))
 
@@ -851,6 +875,10 @@ def connect_callback():
     )
     if pending.get("shared_key_id") and pending.get("shared_key_password"):
         _unlock_shared_key(pending["shared_key_id"], pending["shared_key_password"], conn_id)
+    create_after = pending.get("create_shared_key_after_connect")
+    if create_after and create_after.get("label") and create_after.get("password") and create_after.get("api_key"):
+        sk_id = _create_shared_key(create_after["label"], create_after["password"], create_after["api_key"])
+        _unlock_shared_key(sk_id, create_after["password"], conn_id)
     session.pop("pending_connect", None)
     return redirect(url_for("connect_success", key=conn_id))
 

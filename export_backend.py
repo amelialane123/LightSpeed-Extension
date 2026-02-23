@@ -261,19 +261,26 @@ def _oauth_redirect_uri() -> str:
     """Redirect URI for OAuth. Use HTTPS (Lightspeed only allows https)."""
     uri = (os.environ.get("LIGHTSPEED_REDIRECT_URI") or "").strip()
     if uri:
+        if not uri.startswith("http://") and not uri.startswith("https://"):
+            uri = "https://" + uri
         return uri.rstrip("/")
     base = (os.environ.get("BACKEND_PUBLIC_URL") or "").strip().rstrip("/")
     if base:
+        if not base.startswith("http://") and not base.startswith("https://"):
+            base = "https://" + base
         return f"{base}/connect/callback"
     # Behind a proxy (e.g. Railway): use X-Forwarded headers so we get https and correct host
     try:
-        proto = (request.headers.get("X-Forwarded-Proto") or "https").strip().lower()
+        proto = (request.headers.get("X-Forwarded-Proto") or "https").strip().lower() or "https"
         host = (request.headers.get("X-Forwarded-Host") or request.host or "").strip()
         if host:
             return f"{proto}://{host}/connect/callback"
     except Exception:
         pass
-    return request.url_root.rstrip("/") + "/connect/callback"
+    root = request.url_root.rstrip("/")
+    if root and not root.startswith("http://") and not root.startswith("https://"):
+        root = "https://" + root
+    return root + "/connect/callback"
 
 
 def _extract_airtable_base_id(value: str) -> str | None:

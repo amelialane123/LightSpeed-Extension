@@ -409,22 +409,69 @@ GALLERY_HTML = """<!DOCTYPE html>
       flex-direction: column;
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
-    .card-images {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
+    .card-image-wrap {
+      position: relative;
       padding: 8px;
       background: #f5f5f5;
-      min-height: 50px;
-      align-items: flex-start;
-      align-content: flex-start;
+      min-height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .card-images img {
+    .card-carousel-inner {
+      position: relative;
+      width: 100%;
+      max-height: 220px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card-carousel-slide {
+      display: none;
+      width: 100%;
+    }
+    .card-carousel-slide.active {
+      display: block;
+    }
+    .card-carousel-slide img {
       max-width: 100%;
       height: auto;
       max-height: 220px;
       object-fit: contain;
       border-radius: 4px;
+    }
+    .card-carousel-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 4px;
+      pointer-events: none;
+    }
+    .card-carousel-nav button {
+      pointer-events: auto;
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.5);
+      color: #fff;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .card-carousel-nav button:hover {
+      background: rgba(0,0,0,0.7);
+    }
+    .card-image-wrap .no-image {
+      color: #999;
+      font-size: 12px;
     }
     .card-details {
       padding: 10px;
@@ -454,22 +501,36 @@ GALLERY_HTML = """<!DOCTYPE html>
         break-inside: avoid;
         page-break-inside: avoid;
       }
-      .card-images { background: #fafafa; }
+      .card-image-wrap { background: #fafafa; }
+      .card-carousel-nav { display: none !important; }
+      .card-carousel-slide { display: none !important; }
+      .card-carousel-slide:first-child { display: block !important; }
     }
   </style>
 </head>
 <body>
   <h1>{{ title }}</h1>
-  <p class="muted" style="margin-bottom:1rem;color:#666;">{{ items|length }} item(s). Print or Save as PDF — cards will not be cut across pages.</p>
+  <p class="muted" style="margin-bottom:1rem;color:#666;">{{ items|length }} item(s). Click arrows to change image. Print or Save as PDF shows first image only; cards will not be cut across pages.</p>
   <div class="gallery">
     {% for item in items %}
-    <div class="card">
-      <div class="card-images">
-        {% for url in item.image_urls_list %}
-        <img src="{{ url }}" alt="" loading="lazy">
-        {% endfor %}
-        {% if not item.image_urls_list %}
-        <span style="color:#999;font-size:12px;">No image</span>
+    <div class="card" data-card-index="{{ loop.index0 }}">
+      <div class="card-image-wrap">
+        {% if item.image_urls_list %}
+        <div class="card-carousel-inner">
+          {% for url in item.image_urls_list %}
+          <div class="card-carousel-slide {{ 'active' if loop.first else '' }}" data-slide-index="{{ loop.index0 }}">
+            <img src="{{ url }}" alt="" loading="lazy">
+          </div>
+          {% endfor %}
+        </div>
+        {% if item.image_urls_list|length > 1 %}
+        <div class="card-carousel-nav" aria-hidden="true">
+          <button type="button" class="carousel-prev" title="Previous image">&lsaquo;</button>
+          <button type="button" class="carousel-next" title="Next image">&rsaquo;</button>
+        </div>
+        {% endif %}
+        {% else %}
+        <span class="no-image">No image</span>
         {% endif %}
       </div>
       <div class="card-details">
@@ -485,6 +546,25 @@ GALLERY_HTML = """<!DOCTYPE html>
     </div>
     {% endfor %}
   </div>
+  <script>
+    document.querySelectorAll('.card').forEach(function(card) {
+      var nav = card.querySelector('.card-carousel-nav');
+      if (!nav) return;
+      var inner = card.querySelector('.card-carousel-inner');
+      var slides = inner ? inner.querySelectorAll('.card-carousel-slide') : [];
+      var n = slides.length;
+      if (n <= 1) return;
+      var prevBtn = nav.querySelector('.carousel-prev');
+      var nextBtn = nav.querySelector('.carousel-next');
+      var current = 0;
+      function goTo(i) {
+        current = (i + n) % n;
+        slides.forEach(function(s, j) { s.classList.toggle('active', j === current); });
+      }
+      prevBtn.addEventListener('click', function() { goTo(current - 1); });
+      nextBtn.addEventListener('click', function() { goTo(current + 1); });
+    });
+  </script>
 </body>
 </html>
 """

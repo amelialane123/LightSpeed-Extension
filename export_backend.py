@@ -408,20 +408,22 @@ GALLERY_HTML = """<!DOCTYPE html>
       display: flex;
       flex-direction: column;
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      height: 380px;
     }
     .card-image-wrap {
       position: relative;
+      flex-shrink: 0;
+      width: 100%;
+      height: 220px;
       padding: 8px;
       background: #f5f5f5;
-      min-height: 80px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .card-carousel-inner {
-      position: relative;
-      width: 100%;
-      max-height: 220px;
+      position: absolute;
+      inset: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -429,14 +431,18 @@ GALLERY_HTML = """<!DOCTYPE html>
     .card-carousel-slide {
       display: none;
       width: 100%;
+      height: 100%;
     }
     .card-carousel-slide.active {
-      display: block;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .card-carousel-slide img {
       max-width: 100%;
+      max-height: 100%;
+      width: auto;
       height: auto;
-      max-height: 220px;
       object-fit: contain;
       border-radius: 4px;
     }
@@ -477,6 +483,8 @@ GALLERY_HTML = """<!DOCTYPE html>
       padding: 10px;
       flex: 1;
       min-width: 0;
+      min-height: 0;
+      overflow-y: auto;
     }
     .card-detail {
       font-size: 13px;

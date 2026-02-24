@@ -8,6 +8,9 @@ Run: python export_backend.py
 
 from __future__ import annotations
 
+import base64
+import hmac
+import hashlib
 import json
 import os
 import re
@@ -377,6 +380,40 @@ def api_run():
 
 # ----- Gallery (printable / PDF-friendly view) -----
 
+def _gallery_share_secret() -> bytes:
+    """Secret for signing gallery share tokens (so shared links can't be changed to other categories)."""
+    raw = (os.environ.get("GALLERY_SHARE_SECRET") or "").strip() or (app.secret_key or "")
+    if isinstance(raw, bytes):
+        raw = raw.decode("latin-1")
+    return hashlib.sha256(raw.encode()).digest()
+
+
+def _create_gallery_share_token(connection_id: str, category_id: str | None) -> str:
+    """Create a signed token that locks the gallery to this connection and category (or ALL)."""
+    payload = connection_id + "|" + (category_id or "ALL")
+    payload_b64 = base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    sig = hmac.new(_gallery_share_secret(), payload.encode(), hashlib.sha256).hexdigest()
+    return payload_b64 + "." + sig
+
+
+def _verify_gallery_share_token(token: str) -> tuple[str, str] | None:
+    """Verify token and return (connection_id, category_id_or_ALL) or None."""
+    if not token or "." not in token:
+        return None
+    payload_b64, sig = token.rsplit(".", 1)
+    try:
+        payload = base64.urlsafe_b64decode(payload_b64 + "==").decode()
+    except Exception:
+        return None
+    if "|" not in payload:
+        return None
+    expected = hmac.new(_gallery_share_secret(), payload.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        return None
+    conn_id, cat_id = payload.split("|", 1)
+    return (conn_id.strip(), cat_id.strip() or "ALL")
+
+
 GALLERY_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -519,6 +556,13 @@ GALLERY_HTML = """<!DOCTYPE html>
 <body>
   <h1>{{ title }}</h1>
   <p class="muted" style="margin-bottom:1rem;color:#666;">{{ items|length }} item(s). Click arrows to change image. Print or Save as PDF shows first image only; cards will not be cut across pages.</p>
+  {% if share_url %}
+  <div class="share-box" style="margin-bottom:1rem;padding:10px 12px;background:#e8f4fc;border-radius:6px;font-size:14px;">
+    <strong>Share this gallery</strong> (viewers can only see this category):<br>
+    <a href="{{ share_url }}" id="share-link" style="word-break:break-all;">{{ share_url }}</a>
+    <button type="button" id="copy-share" style="margin-left:8px;padding:4px 10px;cursor:pointer;">Copy link</button>
+  </div>
+  {% endif %}
   <div class="gallery">
     {% for item in items %}
     <div class="card" data-card-index="{{ loop.index0 }}">
@@ -572,6 +616,14 @@ GALLERY_HTML = """<!DOCTYPE html>
       prevBtn.addEventListener('click', function() { goTo(current - 1); });
       nextBtn.addEventListener('click', function() { goTo(current + 1); });
     });
+    var copyBtn = document.getElementById('copy-share');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function() {
+        var el = document.getElementById('share-link');
+        if (!el) return;
+        navigator.clipboard.writeText(el.href).then(function() { copyBtn.textContent = 'Copied!'; });
+      });
+    }
   </script>
 </body>
 </html>
@@ -592,6 +644,39 @@ GALLERY_ERROR_HTML = """<!DOCTYPE html>
 """
 
 
+def _get_gallery_data(key: str, category_id: str | None) -> tuple[list[dict], list[dict], str]:
+    """Load gallery rows, fields, and title for the given connection and category. Raises on error."""
+    row = _get_connection(key)
+    if not row:
+        raise ValueError("Connection not found")
+    access_token, refresh_token = _ensure_fresh_tokens(key)
+    client_id = ls.env("LIGHTSPEED_CLIENT_ID")
+    client_secret = ls.env("LIGHTSPEED_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        raise ValueError("Server misconfigured")
+    session = ls.SessionWithRefresh(access_token, refresh_token, client_id, client_secret)
+    selected = _get_selected_fields(key)
+    rows = ls.export_items(
+        session,
+        row["account_id"],
+        load_relations=[],
+        include_images=True,
+        category_id=category_id,
+        field_ids=selected,
+    )
+    for r in rows:
+        r["image_urls_list"] = [u.strip() for u in (r.get("image_urls") or "").split("|") if u.strip()]
+    fields = ls._fields_for_ids(selected)
+    if category_id:
+        try:
+            title = ls.get_category_name(session, row["account_id"], category_id) or f"Category {category_id}"
+        except Exception:
+            title = f"Category {category_id}"
+    else:
+        title = "All items"
+    return (rows, fields, title)
+
+
 @app.route("/gallery")
 def gallery_page():
     """Printable gallery view of items (category + descendants). No Airtable key required."""
@@ -605,36 +690,49 @@ def gallery_page():
         return render_template_string(GALLERY_ERROR_HTML), 404
     try:
         access_token, refresh_token = _ensure_fresh_tokens(key)
-    except ValueError as e:
+    except ValueError:
         return render_template_string(GALLERY_ERROR_HTML), 404
     client_id = ls.env("LIGHTSPEED_CLIENT_ID")
     client_secret = ls.env("LIGHTSPEED_CLIENT_SECRET")
     if not client_id or not client_secret:
         return "Server misconfigured (missing client credentials).", 500
-    session = ls.SessionWithRefresh(access_token, refresh_token, client_id, client_secret)
-    selected = _get_selected_fields(key)
     try:
-        rows = ls.export_items(
-            session,
-            row["account_id"],
-            load_relations=[],
-            include_images=True,
-            category_id=category_id,
-            field_ids=selected,
-        )
+        rows, fields, title = _get_gallery_data(key, category_id)
+    except ValueError as e:
+        return str(e), 404 if "not found" in str(e).lower() else 500
     except Exception as e:
         return f"Failed to load items: {e}", 500
-    for r in rows:
-        r["image_urls_list"] = [u.strip() for u in (r.get("image_urls") or "").split("|") if u.strip()]
-    fields = ls._fields_for_ids(selected)
-    if category_id:
-        try:
-            title = ls.get_category_name(session, row["account_id"], category_id) or f"Category {category_id}"
-        except Exception:
-            title = f"Category {category_id}"
-    else:
-        title = "All items"
-    return render_template_string(GALLERY_HTML, items=rows, fields=fields, title=title)
+    share_url = None
+    try:
+        token = _create_gallery_share_token(key, category_id)
+        share_url = url_for("gallery_share", token=token, _external=True)
+    except Exception:
+        pass
+    return render_template_string(
+        GALLERY_HTML, items=rows, fields=fields, title=title, share_url=share_url
+    )
+
+
+@app.route("/gallery/s/<token>")
+def gallery_share(token: str):
+    """Locked gallery view: only this category (or all). URL cannot be changed to view other categories."""
+    parsed = _verify_gallery_share_token(token)
+    if not parsed:
+        return render_template_string(GALLERY_ERROR_HTML), 404
+    connection_id, category_param = parsed
+    category_id = None if category_param.upper() == "ALL" else category_param
+    if not _get_connection(connection_id):
+        return render_template_string(GALLERY_ERROR_HTML), 404
+    try:
+        rows, fields, title = _get_gallery_data(connection_id, category_id)
+    except ValueError:
+        return render_template_string(GALLERY_ERROR_HTML), 404
+    except Exception as e:
+        return f"Failed to load items: {e}", 500
+    share_url = request.url
+    return render_template_string(
+        GALLERY_HTML, items=rows, fields=fields, title=title, share_url=share_url
+    )
 
 
 # ----- Connect (multi-tenant OAuth + setup) -----

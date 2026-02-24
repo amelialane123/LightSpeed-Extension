@@ -472,8 +472,10 @@ GALLERY_LOADING_HTML = """<!DOCTYPE html>
   </div>
   <script>
     (function() {
-      var fullUrl = {{ gallery_full_url | tojson }};
-      if (!fullUrl) fullUrl = window.location.origin + '/gallery/full' + window.location.search;
+      var shareToken = {{ share_token | tojson }};
+      var fullUrl = shareToken
+        ? (window.location.origin + '/gallery/full?share_token=' + encodeURIComponent(shareToken))
+        : (window.location.origin + '/gallery/full' + window.location.search);
       fetch(fullUrl)
         .then(function(r) {
           if (!r.ok) throw new Error(r.statusText);
@@ -898,7 +900,7 @@ def gallery_page():
         return render_template_string(GALLERY_ERROR_HTML), 404
     return render_template_string(
         GALLERY_LOADING_HTML,
-        gallery_full_url=None,
+        share_token=None,
     )
 
 
@@ -954,10 +956,9 @@ def gallery_share(token: str):
         return render_template_string(GALLERY_ERROR_HTML), 404
     if not _get_connection(parsed[0]):
         return render_template_string(GALLERY_ERROR_HTML), 404
-    full_url = url_for("gallery_full", share_token=token, _external=True)
     return render_template_string(
         GALLERY_LOADING_HTML,
-        gallery_full_url=full_url,
+        share_token=token,
     )
 
 

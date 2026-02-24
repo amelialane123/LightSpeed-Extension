@@ -667,17 +667,34 @@ GALLERY_HTML = """<!DOCTYPE html>
       .share-export-wrap { display: none !important; }
       .cards-per-row-wrap { display: none !important; }
       h1 { margin-bottom: 0.5rem; }
-      .gallery { gap: 0.75rem; }
+      .gallery { gap: 1rem; }
       .card {
+        height: 380px !important;
+        min-height: 380px !important;
         box-shadow: none;
         border: 1px solid #ccc;
         break-inside: avoid;
         page-break-inside: avoid;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
-      .card-image-wrap { background: #fafafa; }
+      .card-image-wrap {
+        height: 220px !important;
+        min-height: 220px !important;
+        flex-shrink: 0;
+        background: #f5f5f5 !important;
+        padding: 8px;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .card-details {
+        padding: 12px 10px;
+        flex: 1;
+        min-height: 0;
+      }
       .card-carousel-nav { display: none !important; }
       .card-carousel-slide { display: none !important; }
-      .card-carousel-slide:first-child { display: block !important; }
+      .card-carousel-slide:first-child { display: flex !important; align-items: center; justify-content: center; }
     }
   </style>
 </head>

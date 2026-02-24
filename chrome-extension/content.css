@@ -3,24 +3,40 @@
   bottom: 20px;
   right: 20px;
   z-index: 2147483647;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-#ls-airtable-export-btn {
+#ls-airtable-export-btn,
+#ls-gallery-export-btn {
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 500;
   color: #fff;
-  background: #0a0;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 
+#ls-airtable-export-btn {
+  background: #0a0;
+}
+
 #ls-airtable-export-btn:hover {
   background: #080;
 }
 
-#ls-airtable-export-btn:active {
+#ls-gallery-export-btn {
+  background: #06c;
+}
+
+#ls-gallery-export-btn:hover {
+  background: #05a;
+}
+
+#ls-airtable-export-btn:active,
+#ls-gallery-export-btn:active {
   transform: scale(0.98);
 }

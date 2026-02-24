@@ -21,6 +21,21 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     });
     return true;
   }
+  if (msg.action === 'openGallery') {
+    const categoryId = msg.categoryId || 'ALL';
+    chrome.storage.sync.get(['connection_id'], function (data) {
+      const connectionId = (data && data.connection_id) ? data.connection_id.trim() : '';
+      if (!connectionId) {
+        chrome.tabs.create({ url: API_BASE + '/connect' });
+        sendResponse({ ok: false, error: 'Not connected. Add your connection key in the extension options.' });
+        return;
+      }
+      const url = API_BASE + '/gallery?key=' + encodeURIComponent(connectionId) + '&category_id=' + encodeURIComponent(categoryId);
+      chrome.tabs.create({ url: url });
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
   if (msg.action !== 'runExport') {
     sendResponse({ ok: false, error: 'Unknown action' });
     return true;

@@ -30,6 +30,19 @@ You can change which fields are exported at **[https://lightspeed-extension-prod
 
 ---
 
+## Why do stored API keys disappear?
+
+Connection keys and shared (store) API keys are stored in the **backend** database (`connections.db`), not in the extension. If the backend is hosted on **Railway** (or any platform with an ephemeral filesystem), each **deploy or restart** can wipe that file, so keys disappear. Reloading the extension only reloads extension code; the loss happens when the server restarts.
+
+**Fix:** Use **persistent storage** for the DB so it survives restarts and deploys.
+
+- **Railway:** Add a [Volume](https://docs.railway.app/reference/volumes), mount it at e.g. `/data`, then set this in your service:
+  - **Variable:** `CONNECTIONS_DB` = `/data/connections.db`
+  - The app will create the file on the volume; it will persist across deploys.
+- **Elsewhere:** Set `CONNECTIONS_DB` to a path that is on a persistent disk (not the app’s default directory).
+
+---
+
 ## Project layout
 
 ```

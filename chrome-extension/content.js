@@ -63,6 +63,15 @@
     });
   }
 
+  function openGallery() {
+    const categoryId = getCategoryFromPage() || 'ALL';
+    chrome.runtime.sendMessage({ action: 'openGallery', categoryId: categoryId }, function (res) {
+      if (res && !res.ok && res.error) {
+        alert(res.error);
+      }
+    });
+  }
+
   function updateButton() {
     var wrap = document.getElementById('ls-airtable-export-wrap');
     if (isItemSearchPage()) {
@@ -75,9 +84,16 @@
       btn.title = label;
       btn.textContent = 'Export to Airtable';
       btn.addEventListener('click', function () { runExportAndOpenAirtable(btn); });
+      var galleryBtn = document.createElement('button');
+      galleryBtn.type = 'button';
+      galleryBtn.id = 'ls-gallery-export-btn';
+      galleryBtn.title = categoryId ? 'View this category as printable gallery (PDF-friendly)' : 'View all items as printable gallery';
+      galleryBtn.textContent = 'View as gallery';
+      galleryBtn.addEventListener('click', function () { openGallery(); });
       var wrapper = document.createElement('div');
       wrapper.id = 'ls-airtable-export-wrap';
       wrapper.appendChild(btn);
+      wrapper.appendChild(galleryBtn);
       document.body.appendChild(wrapper);
     } else {
       if (wrap) wrap.remove();

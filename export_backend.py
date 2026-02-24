@@ -35,6 +35,8 @@ import lightspeed_export as ls
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 SCRIPT_DIR = Path(__file__).resolve().parent
+# Use CONNECTIONS_DB to point at a persistent path (e.g. Railway volume /data/connections.db)
+# so connection keys and shared API keys survive deploys/restarts.
 DB_PATH = Path(os.environ.get("CONNECTIONS_DB", str(SCRIPT_DIR / "connections.db")))
 
 
@@ -371,6 +373,166 @@ def api_run():
         return jsonify({"success": False, "error": "Export timed out"}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 200
+
+
+# ----- Gallery (printable / PDF-friendly view) -----
+
+GALLERY_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gallery — {{ title }}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 1rem;
+      color: #1a1a1a;
+      background: #f8f9fa;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+      align-items: start;
+    }
+    .card {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .card-images {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px;
+      background: #f5f5f5;
+      min-height: 50px;
+      align-items: flex-start;
+      align-content: flex-start;
+    }
+    .card-images img {
+      max-width: 100%;
+      height: auto;
+      max-height: 220px;
+      object-fit: contain;
+      border-radius: 4px;
+    }
+    .card-details {
+      padding: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+    .card-detail {
+      font-size: 13px;
+      margin-bottom: 6px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+    .card-detail .label {
+      font-weight: 600;
+      color: #555;
+      margin-right: 4px;
+    }
+    .card-detail:last-child { margin-bottom: 0; }
+    @media print {
+      body { margin: 0; background: #fff; }
+      h1 { margin-bottom: 0.5rem; }
+      .gallery { gap: 0.75rem; }
+      .card {
+        box-shadow: none;
+        border: 1px solid #ccc;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .card-images { background: #fafafa; }
+    }
+  </style>
+</head>
+<body>
+  <h1>{{ title }}</h1>
+  <p class="muted" style="margin-bottom:1rem;color:#666;">{{ items|length }} item(s). Print or Save as PDF — cards will not be cut across pages.</p>
+  <div class="gallery">
+    {% for item in items %}
+    <div class="card">
+      <div class="card-images">
+        {% for url in item.image_urls_list %}
+        <img src="{{ url }}" alt="" loading="lazy">
+        {% endfor %}
+        {% if not item.image_urls_list %}
+        <span style="color:#999;font-size:12px;">No image</span>
+        {% endif %}
+      </div>
+      <div class="card-details">
+        {% for field in fields %}
+        {% if field.rowKey != 'image_urls' and field.rowKey != 'image' %}
+        {% set val = item.get(field.rowKey) %}
+        {% if val is not none and val != '' %}
+        <div class="card-detail"><span class="label">{{ field.displayName }}:</span> {{ val }}</div>
+        {% endif %}
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</body>
+</html>
+"""
+
+
+@app.route("/gallery")
+def gallery_page():
+    """Printable gallery view of items (category + descendants). No Airtable key required."""
+    key = (request.args.get("key") or "").strip()
+    category_id_param = (request.args.get("category_id") or "").strip()
+    category_id = category_id_param if category_id_param and category_id_param.upper() != "ALL" else None
+    if not key:
+        return "Missing key. Use the extension to open the gallery.", 400
+    try:
+        access_token, refresh_token = _ensure_fresh_tokens(key)
+    except ValueError as e:
+        return str(e), 403
+    row = _get_connection(key)
+    if not row:
+        return "Connection not found. Reconnect at /connect.", 404
+    client_id = ls.env("LIGHTSPEED_CLIENT_ID")
+    client_secret = ls.env("LIGHTSPEED_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        return "Server misconfigured (missing client credentials).", 500
+    session = ls.SessionWithRefresh(access_token, refresh_token, client_id, client_secret)
+    selected = _get_selected_fields(key)
+    try:
+        rows = ls.export_items(
+            session,
+            row["account_id"],
+            load_relations=[],
+            include_images=True,
+            category_id=category_id,
+            field_ids=selected,
+        )
+    except Exception as e:
+        return f"Failed to load items: {e}", 500
+    for r in rows:
+        r["image_urls_list"] = [u.strip() for u in (r.get("image_urls") or "").split("|") if u.strip()]
+    fields = ls._fields_for_ids(selected)
+    if category_id:
+        try:
+            title = ls.get_category_name(session, row["account_id"], category_id) or f"Category {category_id}"
+        except Exception:
+            title = f"Category {category_id}"
+    else:
+        title = "All items"
+    return render_template_string(GALLERY_HTML, items=rows, fields=fields, title=title)
 
 
 # ----- Connect (multi-tenant OAuth + setup) -----

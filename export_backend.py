@@ -1350,6 +1350,47 @@ SETTINGS_HTML = """
 </html>
 """
 
+PRIVACY_POLICY_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy — Lightspeed → Airtable</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1.5rem; color: #1a1a1a; line-height: 1.6; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.15rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    p, li { margin-bottom: 0.75rem; }
+    ul { padding-left: 1.5rem; }
+    .updated { color: #666; font-size: 0.9rem; }
+    a { color: #06c; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Lightspeed → Airtable extension and backend. Last updated: 2025.</p>
+
+  <h2>Overview</h2>
+  <p>This policy describes what data the Lightspeed → Airtable Chrome extension and its backend collect and how that data is used. We collect only what is necessary to provide the export and gallery features.</p>
+
+  <h2>Data we collect and use</h2>
+  <ul>
+    <li><strong>Connection key (authentication).</strong> When you connect your Lightspeed and Airtable accounts, we create and store a connection key. The extension stores this key locally in Chrome (sync storage) and sends it to our backend when you run an export or open the gallery. The backend stores Lightspeed OAuth tokens and, if you provide one, your Airtable API key, so we can perform exports on your behalf. We do not sell or share these credentials.</li>
+    <li><strong>Page context on Lightspeed.</strong> When you use the extension on a Lightspeed Inventory/Items page, we read the current page URL and context (e.g. category ID, listing filters) only to determine which items to export or show in the gallery. We do not collect your full browsing history or any content from other sites.</li>
+  </ul>
+
+  <h2>Where data is stored</h2>
+  <p>The connection key is stored in your browser via Chrome sync storage. The backend stores connection data (tokens, Airtable base ID, selected fields) in its own database. If the backend is hosted on a platform with persistent storage (e.g. a Railway volume), that data persists; otherwise it may be lost on restart (see the extension README).</p>
+
+  <h2>How we use data</h2>
+  <p>We use the data above only to: (1) authenticate you with our backend, (2) run exports from Lightspeed to Airtable, and (3) show the gallery view. We do not sell or transfer your data to third parties. We do not use your data for advertising, creditworthiness, or lending.</p>
+
+  <h2>Contact</h2>
+  <p>For questions about this policy or your data, use the contact or support channel for this extension (e.g. the extension’s listing or repository).</p>
+</body>
+</html>
+"""
+
 
 @app.route("/")
 def index():
@@ -1357,6 +1398,11 @@ def index():
         "ok": True,
         "message": "Lightspeed → Airtable backend (multi-tenant). Use /connect to connect your account; use the extension with your connection key.",
     }), 200
+
+
+@app.route("/privacy")
+def privacy_page():
+    return render_template_string(PRIVACY_POLICY_HTML)
 
 
 @app.route("/connect", methods=["GET"])

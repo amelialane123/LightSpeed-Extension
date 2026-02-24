@@ -406,6 +406,24 @@ def build_category_path_map(
     return out
 
 
+def get_category_id_and_descendants(
+    category_path_map: dict[str, list[str]], category_id: str
+) -> set[str]:
+    """Return set of category_id and all descendant category IDs (by path prefix).
+    E.g. 'Melamine Dinnerware' includes 'Melamine Dinner Plates', etc.
+    """
+    if not category_id or category_id not in category_path_map:
+        return {category_id} if category_id else set()
+    selected_parts = category_path_map[category_id]
+    selected_path = "/".join(selected_parts)
+    out: set[str] = {category_id}
+    for cid, parts in category_path_map.items():
+        path = "/".join(parts)
+        if path.startswith(selected_path + "/"):
+            out.add(cid)
+    return out
+
+
 def build_manufacturer_map(
     session: requests.Session | SessionWithRefresh, account_id: str
 ) -> dict[str, str]:
@@ -605,17 +623,18 @@ def export_items(
     if include_images and "Images" not in needed_relations:
         needed_relations.append("Images")
 
-    # Only fetch lookup tables that selected fields need
+    # Only fetch lookup tables that selected fields need (also need categories when filtering by category + descendants)
     need_vendor = "vendor_name" in ids
     need_category = "category" in ids or any(f"subcategory_{i}" in ids for i in range(1, 10))
     need_manufacturer = "brand" in ids
     need_department = "department" in ids
+    need_category_for_filter = bool(category_id)
 
     tasks = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         if need_vendor:
             tasks.append(("vendor", executor.submit(build_vendor_map, session, account_id)))
-        if need_category:
+        if need_category or need_category_for_filter:
             tasks.append(("category", executor.submit(build_category_path_map, session, account_id)))
         if need_manufacturer:
             tasks.append(("manufacturer", executor.submit(build_manufacturer_map, session, account_id)))
@@ -653,36 +672,51 @@ def export_items(
         if rel not in relations:
             relations.append(rel)
 
-    extra = {"categoryID": category_id} if category_id else None
-    if category_id:
-        print(f"Filtering items by category ID: {category_id}", file=sys.stderr)
-    print("Fetching items (paginated)...", file=sys.stderr)
-    try:
-        items = fetch_all_paginated(
-            session,
-            account_id,
-            "Item",
-            load_relations=relations,
-            sort="itemID",
-            extra_params=extra,
-        )
-    except requests.exceptions.HTTPError as e:
-        if e.response is not None and e.response.status_code == 400:
-            print(
-                "  API returned 400 with full relations; retrying with Images only (some fields may be empty).",
-                file=sys.stderr,
-            )
-            relations = ["Images"]
-            items = fetch_all_paginated(
+    def fetch_items_for_params(extra_params: dict | None) -> list[dict]:
+        try:
+            return fetch_all_paginated(
                 session,
                 account_id,
                 "Item",
                 load_relations=relations,
                 sort="itemID",
-                extra_params=extra,
+                extra_params=extra_params,
             )
-        else:
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 400:
+                print(
+                    "  API returned 400 with full relations; retrying with Images only (some fields may be empty).",
+                    file=sys.stderr,
+                )
+                return fetch_all_paginated(
+                    session,
+                    account_id,
+                    "Item",
+                    load_relations=["Images"],
+                    sort="itemID",
+                    extra_params=extra_params,
+                )
             raise
+
+    if category_id:
+        descendant_ids = get_category_id_and_descendants(category_path_map, category_id)
+        print(
+            f"Filtering items by category ID: {category_id} and {len(descendant_ids)} category/categories (including descendants).",
+            file=sys.stderr,
+        )
+        print("Fetching items (paginated)...", file=sys.stderr)
+        seen_item_ids: set[str] = set()
+        items = []
+        for cid in descendant_ids:
+            batch = fetch_items_for_params({"categoryID": cid})
+            for item in batch:
+                iid = str(item.get("itemID", ""))
+                if iid and iid not in seen_item_ids:
+                    seen_item_ids.add(iid)
+                    items.append(item)
+    else:
+        print("Fetching items (paginated)...", file=sys.stderr)
+        items = fetch_items_for_params(None)
     print(f"  Loaded {len(items)} items.", file=sys.stderr)
 
     rows = [

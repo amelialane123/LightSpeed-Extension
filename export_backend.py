@@ -318,6 +318,9 @@ def api_run():
     data = request.get_json() or {}
     connection_id = (data.get("connection_id") or "").strip()
     category_id = (data.get("category_id") or "").strip() or "ALL"
+    listing_filters = data.get("listing_filters")
+    if not isinstance(listing_filters, dict):
+        listing_filters = {}
     if not connection_id:
         return jsonify({"success": False, "error": "Missing connection_id. Add your connection key in the extension options."}), 200
     try:
@@ -347,6 +350,8 @@ def api_run():
         "AIRTABLE_FIELDS": ",".join(selected),
         "FROM_EXPORT_BACKEND": "1",  # script skips opening browser; extension opens the tab
     }
+    if listing_filters:
+        env["EXPORT_LISTING_FILTERS"] = json.dumps(listing_filters)
     cmd = [sys.executable, str(SCRIPT_DIR / "lightspeed_export.py")]
     if category_id.upper() != "ALL":
         cmd.extend(["--category-id", category_id])
@@ -412,6 +417,89 @@ def _verify_gallery_share_token(token: str) -> tuple[str, str] | None:
         return None
     conn_id, cat_id = payload.split("|", 1)
     return (conn_id.strip(), cat_id.strip() or "ALL")
+
+
+GALLERY_LOADING_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loading gallery…</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #f8f9fa;
+      color: #1a1a1a;
+    }
+    .loading-box {
+      text-align: center;
+      padding: 2rem;
+    }
+    .loading-box h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0 0 1rem;
+    }
+    .loading-box p {
+      margin: 0 0 1.5rem;
+      color: #555;
+    }
+    .dots {
+      display: inline-block;
+      min-width: 1.5em;
+      text-align: left;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #06c;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="loading-box">
+    <div class="spinner" aria-hidden="true"></div>
+    <h2>Loading your gallery</h2>
+    <p>This may take a moment<span class="dots"></span></p>
+  </div>
+  <script>
+    (function() {
+      var fullUrl = {{ gallery_full_url | tojson }};
+      if (!fullUrl) fullUrl = window.location.origin + '/gallery/full' + window.location.search;
+      var dotsEl = document.querySelector('.dots');
+      var n = 0;
+      if (dotsEl) setInterval(function() { n++; dotsEl.textContent = '.'.repeat((n % 3) + 1); }, 400);
+      fetch(fullUrl)
+        .then(function(r) {
+          if (!r.ok) throw new Error(r.statusText);
+          return r.text();
+        })
+        .then(function(html) {
+          document.open();
+          document.write(html);
+          document.close();
+        })
+        .catch(function(err) {
+          document.querySelector('.loading-box').innerHTML = '<h2>Could not load gallery</h2><p>' + (err.message || 'Something went wrong.') + '</p><p><a href="' + window.location.pathname + '">Try again</a></p>';
+        });
+    })();
+  </script>
+</body>
+</html>
+"""
 
 
 GALLERY_HTML = """<!DOCTYPE html>
@@ -536,8 +624,23 @@ GALLERY_HTML = """<!DOCTYPE html>
       margin-right: 4px;
     }
     .card-detail:last-child { margin-bottom: 0; }
+    .share-popup-item {
+      display: block;
+      width: 100%;
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 14px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #1a1a1a;
+    }
+    .share-popup-item:hover { background: #f0f0f0; }
+    .share-popup-item:first-child { border-radius: 8px 8px 0 0; }
+    .share-popup-item:last-child { border-radius: 0 0 8px 8px; }
     @media print {
       body { margin: 0; background: #fff; }
+      .share-export-wrap { display: none !important; }
       h1 { margin-bottom: 0.5rem; }
       .gallery { gap: 0.75rem; }
       .card {
@@ -557,10 +660,13 @@ GALLERY_HTML = """<!DOCTYPE html>
   <h1>{{ title }}</h1>
   <p class="muted" style="margin-bottom:1rem;color:#666;">{{ items|length }} item(s). Click arrows to change image. Print or Save as PDF shows first image only; cards will not be cut across pages.</p>
   {% if share_url %}
-  <div class="share-box" style="margin-bottom:1rem;padding:10px 12px;background:#e8f4fc;border-radius:6px;font-size:14px;">
-    <strong>Share this gallery</strong> (viewers can only see this category):<br>
-    <a href="{{ share_url }}" id="share-link" style="word-break:break-all;">{{ share_url }}</a>
-    <button type="button" id="copy-share" style="margin-left:8px;padding:4px 10px;cursor:pointer;">Copy link</button>
+  <div class="share-export-wrap" style="margin-bottom:1rem;position:relative;">
+    <button type="button" id="share-export-btn" style="padding:8px 16px;font-size:14px;font-weight:500;color:#fff;background:#06c;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">Share / Export &#9662;</button>
+    <div id="share-export-popup" class="share-popup" style="display:none;position:absolute;top:100%;left:0;margin-top:6px;min-width:200px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:100;padding:6px 0;">
+      <button type="button" class="share-popup-item" data-action="copy">Copy link</button>
+      <button type="button" class="share-popup-item" data-action="print">Print / Save as PDF</button>
+      <button type="button" class="share-popup-item" data-action="csv">Download CSV</button>
+    </div>
   </div>
   {% endif %}
   <div class="gallery">
@@ -598,6 +704,13 @@ GALLERY_HTML = """<!DOCTYPE html>
     </div>
     {% endfor %}
   </div>
+  {% if share_url %}
+  <script>
+    window.GALLERY_SHARE_URL = {{ share_url | tojson }};
+    window.GALLERY_ITEMS = {{ items | tojson }};
+    window.GALLERY_FIELDS = {{ fields | tojson }};
+  </script>
+  {% endif %}
   <script>
     document.querySelectorAll('.card').forEach(function(card) {
       var nav = card.querySelector('.card-carousel-nav');
@@ -616,12 +729,46 @@ GALLERY_HTML = """<!DOCTYPE html>
       prevBtn.addEventListener('click', function() { goTo(current - 1); });
       nextBtn.addEventListener('click', function() { goTo(current + 1); });
     });
-    var copyBtn = document.getElementById('copy-share');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', function() {
-        var el = document.getElementById('share-link');
-        if (!el) return;
-        navigator.clipboard.writeText(el.href).then(function() { copyBtn.textContent = 'Copied!'; });
+    var shareBtn = document.getElementById('share-export-btn');
+    var popup = document.getElementById('share-export-popup');
+    if (shareBtn && popup) {
+      shareBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
+      });
+      document.addEventListener('click', function() { popup.style.display = 'none'; });
+      popup.addEventListener('click', function(e) { e.stopPropagation(); });
+      popup.querySelectorAll('.share-popup-item').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var action = this.getAttribute('data-action');
+          popup.style.display = 'none';
+          if (action === 'copy' && window.GALLERY_SHARE_URL) {
+            navigator.clipboard.writeText(window.GALLERY_SHARE_URL).then(function() {
+              shareBtn.textContent = 'Copied!';
+              setTimeout(function() { shareBtn.innerHTML = 'Share / Export &#9662;'; }, 1500);
+            });
+          } else if (action === 'print') {
+            window.print();
+          } else if (action === 'csv' && window.GALLERY_ITEMS && window.GALLERY_FIELDS) {
+            var fields = window.GALLERY_FIELDS.filter(function(f) { return f.rowKey !== 'image_urls' && f.rowKey !== 'image'; });
+            var header = fields.map(function(f) { return '"' + (f.displayName || f.rowKey || '').replace(/"/g, '""') + '"'; }).join(',');
+            var rows = window.GALLERY_ITEMS.map(function(item) {
+              return fields.map(function(f) {
+                var v = item[f.rowKey];
+                if (v == null) v = '';
+                v = String(v).replace(/"/g, '""');
+                return '"' + v + '"';
+              }).join(',');
+            });
+            var csv = [header].concat(rows).join("\\n");
+            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'gallery-export.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+          }
+        });
       });
     }
   </script>
@@ -644,7 +791,11 @@ GALLERY_ERROR_HTML = """<!DOCTYPE html>
 """
 
 
-def _get_gallery_data(key: str, category_id: str | None) -> tuple[list[dict], list[dict], str]:
+def _get_gallery_data(
+    key: str,
+    category_id: str | None,
+    listing_filters: dict | None = None,
+) -> tuple[list[dict], list[dict], str]:
     """Load gallery rows, fields, and title for the given connection and category. Raises on error."""
     row = _get_connection(key)
     if not row:
@@ -663,6 +814,7 @@ def _get_gallery_data(key: str, category_id: str | None) -> tuple[list[dict], li
         include_images=True,
         category_id=category_id,
         field_ids=selected,
+        listing_filters=listing_filters or {},
     )
     for r in rows:
         r["image_urls_list"] = [u.strip() for u in (r.get("image_urls") or "").split("|") if u.strip()]
@@ -677,61 +829,97 @@ def _get_gallery_data(key: str, category_id: str | None) -> tuple[list[dict], li
     return (rows, fields, title)
 
 
-@app.route("/gallery")
-def gallery_page():
-    """Printable gallery view of items (category + descendants). No Airtable key required."""
-    key = (request.args.get("key") or "").strip()
-    category_id_param = (request.args.get("category_id") or "").strip()
-    category_id = category_id_param if category_id_param and category_id_param.upper() != "ALL" else None
-    if not key:
-        return "Missing key. Use the extension to open the gallery.", 400
+def _render_gallery_full(
+    key: str,
+    category_id: str | None,
+    listing_filters: dict,
+    share_url: str | None = None,
+) -> str:
+    """Load gallery data and return full gallery HTML. Used by /gallery/full."""
     row = _get_connection(key)
     if not row:
-        return render_template_string(GALLERY_ERROR_HTML), 404
-    try:
-        access_token, refresh_token = _ensure_fresh_tokens(key)
-    except ValueError:
-        return render_template_string(GALLERY_ERROR_HTML), 404
+        return ""
+    access_token, refresh_token = _ensure_fresh_tokens(key)
     client_id = ls.env("LIGHTSPEED_CLIENT_ID")
     client_secret = ls.env("LIGHTSPEED_CLIENT_SECRET")
     if not client_id or not client_secret:
-        return "Server misconfigured (missing client credentials).", 500
+        return ""
+    rows, fields, title = _get_gallery_data(key, category_id, listing_filters=listing_filters)
+    return render_template_string(
+        GALLERY_HTML, items=rows, fields=fields, title=title, share_url=share_url or ""
+    )
+
+
+@app.route("/gallery")
+def gallery_page():
+    """Returns loading shell immediately; client fetches /gallery/full for actual content."""
+    key = (request.args.get("key") or "").strip()
+    if not key:
+        return "Missing key. Use the extension to open the gallery.", 400
+    if not _get_connection(key):
+        return render_template_string(GALLERY_ERROR_HTML), 404
+    return render_template_string(
+        GALLERY_LOADING_HTML,
+        gallery_full_url=None,
+    )
+
+
+@app.route("/gallery/full")
+def gallery_full():
+    """Heavy gallery render (called by loading page via fetch)."""
+    key = (request.args.get("key") or "").strip()
+    share_token = (request.args.get("share_token") or "").strip()
+    if share_token:
+        parsed = _verify_gallery_share_token(share_token)
+        if not parsed:
+            return render_template_string(GALLERY_ERROR_HTML), 404
+        key, category_param = parsed
+        category_id = None if category_param.upper() == "ALL" else category_param
+        listing_filters = {}
+        share_url = url_for("gallery_share", token=share_token, _external=True)
+    else:
+        category_id_param = (request.args.get("category_id") or "").strip()
+        category_id = category_id_param if category_id_param and category_id_param.upper() != "ALL" else None
+        listing_filters = {}
+        try:
+            raw = (request.args.get("listing_filters") or "").strip()
+            if raw:
+                listing_filters = json.loads(raw)
+                if not isinstance(listing_filters, dict):
+                    listing_filters = {}
+        except (json.JSONDecodeError, TypeError):
+            pass
+        share_url = None
+        try:
+            token = _create_gallery_share_token(key, category_id)
+            share_url = url_for("gallery_share", token=token, _external=True)
+        except Exception:
+            pass
+    if not key:
+        return "Missing key.", 400
     try:
-        rows, fields, title = _get_gallery_data(key, category_id)
-    except ValueError as e:
-        return str(e), 404 if "not found" in str(e).lower() else 500
+        html = _render_gallery_full(key, category_id, listing_filters, share_url=share_url)
+    except ValueError:
+        return render_template_string(GALLERY_ERROR_HTML), 404
     except Exception as e:
         return f"Failed to load items: {e}", 500
-    share_url = None
-    try:
-        token = _create_gallery_share_token(key, category_id)
-        share_url = url_for("gallery_share", token=token, _external=True)
-    except Exception:
-        pass
-    return render_template_string(
-        GALLERY_HTML, items=rows, fields=fields, title=title, share_url=share_url
-    )
+    if not html:
+        return render_template_string(GALLERY_ERROR_HTML), 404
+    return html
 
 
 @app.route("/gallery/s/<token>")
 def gallery_share(token: str):
-    """Locked gallery view: only this category (or all). URL cannot be changed to view other categories."""
+    """Returns loading shell; client fetches /gallery/full?share_token= for actual content."""
     parsed = _verify_gallery_share_token(token)
     if not parsed:
         return render_template_string(GALLERY_ERROR_HTML), 404
-    connection_id, category_param = parsed
-    category_id = None if category_param.upper() == "ALL" else category_param
-    if not _get_connection(connection_id):
+    if not _get_connection(parsed[0]):
         return render_template_string(GALLERY_ERROR_HTML), 404
-    try:
-        rows, fields, title = _get_gallery_data(connection_id, category_id)
-    except ValueError:
-        return render_template_string(GALLERY_ERROR_HTML), 404
-    except Exception as e:
-        return f"Failed to load items: {e}", 500
-    share_url = request.url
+    full_url = url_for("gallery_full", share_token=token, _external=True)
     return render_template_string(
-        GALLERY_HTML, items=rows, fields=fields, title=title, share_url=share_url
+        GALLERY_LOADING_HTML,
+        gallery_full_url=full_url,
     )
 
 

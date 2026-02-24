@@ -464,6 +464,43 @@ def get_average_cost(item: dict) -> str:
     return (shop_list[0].get("averageCost") or "").strip() if shop_list else ""
 
 
+def get_item_qoh(item: dict) -> float:
+    """Sum quantity on hand across all ItemShops. Returns 0 if ItemShops not loaded or missing."""
+    shops = item.get("ItemShops") or {}
+    shop_list = shops.get("ItemShop") if isinstance(shops, dict) else []
+    if not shop_list:
+        return 0.0
+    if isinstance(shop_list, dict):
+        shop_list = [shop_list]
+    total = 0.0
+    for s in shop_list:
+        if isinstance(s, dict):
+            try:
+                total += float(s.get("qoh") or 0)
+            except (TypeError, ValueError):
+                pass
+    return total
+
+
+def get_item_qoh_for_shop(item: dict, shop_id: str) -> float:
+    """Quantity on hand for a specific shop. Returns 0 if ItemShops not loaded or shop not found."""
+    shops = item.get("ItemShops") or {}
+    shop_list = shops.get("ItemShop") if isinstance(shops, dict) else []
+    if not shop_list:
+        return 0.0
+    if isinstance(shop_list, dict):
+        shop_list = [shop_list]
+    sid = str(shop_id).strip()
+    for s in shop_list:
+        if isinstance(s, dict) and str(s.get("shopID", "")) == sid:
+            try:
+                return float(s.get("qoh") or 0)
+            except (TypeError, ValueError):
+                pass
+            return 0.0
+    return 0.0
+
+
 def get_item_note(item: dict) -> str:
     """Extract first note text from Item.Note."""
     notes = item.get("Note") or {}
@@ -606,6 +643,103 @@ def _relations_for_field_ids(field_ids: list[str]) -> list[str]:
     return rels
 
 
+def _listing_filters_from_env() -> dict:
+    """Parse EXPORT_LISTING_FILTERS env (JSON) into a dict. Returns {} if unset or invalid."""
+    raw = env("EXPORT_LISTING_FILTERS", "").strip()
+    if not raw:
+        return {}
+    try:
+        out = json.loads(raw)
+        return out if isinstance(out, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def _item_linked_to_vendor(item: dict, vendor_id: str) -> bool:
+    """True if item's defaultVendorID or any ItemVendorNum.vendorID matches vendor_id."""
+    vid = str(vendor_id).strip()
+    if str(item.get("defaultVendorID") or "") == vid:
+        return True
+    vnums = item.get("ItemVendorNums") or {}
+    vlist = vnums.get("ItemVendorNum") if isinstance(vnums, dict) else []
+    if isinstance(vlist, dict):
+        vlist = [vlist]
+    for v in vlist or []:
+        if isinstance(v, dict) and str(v.get("vendorID") or "") == vid:
+            return True
+    return False
+
+
+def _apply_listing_filters(
+    items: list[dict], listing_filters: dict
+) -> list[dict]:
+    """Apply post-fetch filters (qoh, shop, item_type, serialized, item_vendor_id). Returns filtered list."""
+    if not listing_filters:
+        return items
+    qoh_positive = (listing_filters.get("qoh_positive") or "").lower()
+    qoh_zero = (listing_filters.get("qoh_zero") or "").lower()
+    shop_id = (listing_filters.get("shop_id") or "").strip()
+    if shop_id in ("", "-1"):
+        shop_id = None
+    item_vendor_id = (listing_filters.get("item_vendor_id") or "").strip()
+    if item_vendor_id in ("", "-1"):
+        item_vendor_id = None
+    item_type = (listing_filters.get("item_type") or "").strip()
+    if item_type in ("", "-1"):
+        item_type = None
+    serialized = (listing_filters.get("serialized") or "").strip().lower()
+    if serialized in ("", "-1"):
+        serialized = None
+
+    def keep(item: dict) -> bool:
+        if item_vendor_id is not None and not _item_linked_to_vendor(item, item_vendor_id):
+            return False
+        if item_type is not None:
+            it = (item.get("itemType") or "").strip().lower()
+            if item_type.isdigit():
+                type_map = {"0": "default", "1": "non_inventory", "2": "serialized", "3": "box", "4": "serialized_assembly", "5": "assembly"}
+                want = type_map.get(item_type, "")
+                if want and it != want:
+                    return False
+            elif it != item_type.lower():
+                return False
+        if serialized is not None:
+            want_serial = serialized in ("1", "on", "true", "yes")
+            item_serial = item.get("serialized") in (True, "true", "1")
+            if item_serial != want_serial:
+                return False
+        if qoh_positive == "on" and qoh_zero == "off":
+            qoh = get_item_qoh_for_shop(item, shop_id) if shop_id else get_item_qoh(item)
+            if qoh <= 0:
+                return False
+        elif qoh_positive == "off" and qoh_zero == "on":
+            qoh = get_item_qoh_for_shop(item, shop_id) if shop_id else get_item_qoh(item)
+            if qoh != 0:
+                return False
+        return True
+
+    return [i for i in items if keep(i)]
+
+
+def _api_extra_from_listing_filters(listing_filters: dict, base: dict | None = None) -> dict:
+    """Build API extra_params from listing_filters (archived, manufacturerID, defaultVendorID)."""
+    out = dict(base or {})
+    archived = (listing_filters.get("archived") or "").strip().lower()
+    if archived == "off":
+        out["archived"] = "false"
+    elif archived == "on":
+        out["archived"] = "true"
+    elif archived == "only":
+        out["archived"] = "only"
+    mid = (listing_filters.get("manufacturer_id") or "").strip()
+    if mid and mid != "-1":
+        out["manufacturerID"] = mid
+    vid = (listing_filters.get("vendor_id") or "").strip()
+    if vid and vid != "-1":
+        out["defaultVendorID"] = vid
+    return out
+
+
 def export_items(
     session: requests.Session | SessionWithRefresh,
     account_id: str,
@@ -613,15 +747,30 @@ def export_items(
     include_images: bool,
     category_id: str | None = None,
     field_ids: list[str] | None = None,
+    qoh_positive_only: bool = False,
+    listing_filters: dict | None = None,
 ) -> list[dict]:
     """Fetch all items and vendors, return list of Airtable-ready rows.
     When field_ids is set, only fetches relations and lookup data needed for those fields.
+    When listing_filters is set (or EXPORT_LISTING_FILTERS env), applies UI filters: archived, brand/vendor, shop, qoh, item_type, serialized.
+    qoh_positive_only is legacy; prefer listing_filters with qoh_positive/qoh_zero.
     """
+    filters = listing_filters if listing_filters is not None else _listing_filters_from_env()
+    if qoh_positive_only and not filters:
+        filters = {"qoh_positive": "on", "qoh_zero": "off"}
     ids = field_ids or _field_ids_from_env()
     needed_relations = _relations_for_field_ids(ids)
-    # Always include Images if caller asked for include_images (e.g. default export)
     if include_images and "Images" not in needed_relations:
         needed_relations.append("Images")
+    needs_qoh = (
+        filters.get("qoh_positive") == "on"
+        or filters.get("qoh_zero") == "on"
+        or (filters.get("shop_id") or "").strip() not in ("", "-1")
+    )
+    if needs_qoh and "ItemShops" not in needed_relations:
+        needed_relations.append("ItemShops")
+    if (filters.get("item_vendor_id") or "").strip() not in ("", "-1") and "ItemVendorNums" not in needed_relations:
+        needed_relations.append("ItemVendorNums")
 
     # Only fetch lookup tables that selected fields need (also need categories when filtering by category + descendants)
     need_vendor = "vendor_name" in ids
@@ -698,6 +847,7 @@ def export_items(
                 )
             raise
 
+    api_extra = _api_extra_from_listing_filters(filters)
     if category_id:
         descendant_ids = get_category_id_and_descendants(category_path_map, category_id)
         print(
@@ -708,7 +858,8 @@ def export_items(
         seen_item_ids: set[str] = set()
         items = []
         for cid in descendant_ids:
-            batch = fetch_items_for_params({"categoryID": cid})
+            params = _api_extra_from_listing_filters(filters, {"categoryID": cid})
+            batch = fetch_items_for_params(params)
             for item in batch:
                 iid = str(item.get("itemID", ""))
                 if iid and iid not in seen_item_ids:
@@ -716,8 +867,14 @@ def export_items(
                     items.append(item)
     else:
         print("Fetching items (paginated)...", file=sys.stderr)
-        items = fetch_items_for_params(None)
+        items = fetch_items_for_params(api_extra if api_extra else None)
     print(f"  Loaded {len(items)} items.", file=sys.stderr)
+
+    if filters:
+        before = len(items)
+        items = _apply_listing_filters(items, filters)
+        if len(items) != before:
+            print(f"  Applied listing filters: {len(items)} items (from {before}).", file=sys.stderr)
 
     rows = [
         item_to_row(
@@ -1178,6 +1335,7 @@ def main() -> None:
         include_images=("image" in field_ids),
         category_id=category_id,
         field_ids=field_ids,
+        listing_filters=_listing_filters_from_env(),
     )
 
     base = args.output_dir / "lightspeed_items"

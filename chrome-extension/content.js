@@ -6,6 +6,24 @@
     return href.includes('item.listings') || href.includes('form_name=listing');
   }
 
+  /** Collect listing filters from current URL (matches Lightspeed item list filters). -1 or empty = no filter / all. */
+  function getListingFiltersFromPage() {
+    const p = new URL(window.location.href).searchParams;
+    return {
+      archived: (p.get('archived') || '').trim(),
+      manufacturer_id: (p.get('manufacturer_id') || '').trim(),
+      vendor_id: (p.get('vendor_id') || '').trim(),
+      item_vendor_id: (p.get('item_vendor_id') || '').trim(),
+      shop_id: (p.get('shop_id') || '').trim(),
+      item_type: (p.get('item_type') || '').trim(),
+      serialized: (p.get('serialized') || '').trim(),
+      qoh_positive: (p.get('qoh_positive') || '').toLowerCase(),
+      qoh_zero: (p.get('qoh_zero') || '').toLowerCase(),
+      tags: (p.get('tags') || '').trim(),
+      neg_tags: (p.get('neg_tags') || '').trim()
+    };
+  }
+
   function getCategoryFromPage() {
     const url = window.location.href;
     const parsed = new URL(url);
@@ -46,7 +64,8 @@
     btn.disabled = true;
     btn.textContent = 'Exporting…';
 
-    chrome.runtime.sendMessage({ action: 'runExport', categoryId: categoryId }, function (res) {
+    const listingFilters = getListingFiltersFromPage();
+    chrome.runtime.sendMessage({ action: 'runExport', categoryId: categoryId, listingFilters: listingFilters }, function (res) {
       if (res && !res.ok) {
         var msg = res.error || 'Export failed';
         if (msg.includes('Reconnect') || msg.includes('reconnect')) {
@@ -65,7 +84,8 @@
 
   function openGallery() {
     const categoryId = getCategoryFromPage() || 'ALL';
-    chrome.runtime.sendMessage({ action: 'openGallery', categoryId: categoryId }, function (res) {
+    const listingFilters = getListingFiltersFromPage();
+    chrome.runtime.sendMessage({ action: 'openGallery', categoryId: categoryId, listingFilters: listingFilters }, function (res) {
       if (res && !res.ok && res.error) {
         alert(res.error);
       }

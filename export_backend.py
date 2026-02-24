@@ -389,11 +389,15 @@ def api_run():
 # ----- Gallery (printable / PDF-friendly view) -----
 
 def _gallery_share_secret() -> bytes:
-    """Secret for signing gallery share tokens (so shared links can't be changed to other categories)."""
-    raw = (os.environ.get("GALLERY_SHARE_SECRET") or "").strip() or (app.secret_key or "")
+    """Secret for signing gallery share tokens. Use GALLERY_SHARE_SECRET or FLASK_SECRET_KEY in production so share links work across workers/restarts."""
+    raw = (
+        (os.environ.get("GALLERY_SHARE_SECRET") or "").strip()
+        or (os.environ.get("FLASK_SECRET_KEY") or "").strip()
+        or (app.secret_key or "")
+    )
     if isinstance(raw, bytes):
         raw = raw.decode("latin-1")
-    return hashlib.sha256(raw.encode()).digest()
+    return hashlib.sha256((raw or "fallback").encode()).digest()
 
 
 def _create_gallery_share_token(connection_id: str, category_id: str | None) -> str:
@@ -833,6 +837,18 @@ GALLERY_ERROR_HTML = """<!DOCTYPE html>
 </html>
 """
 
+GALLERY_SHARE_ERROR_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Share link unavailable</title></head>
+<body style="font-family:system-ui,sans-serif;max-width:480px;margin:3rem auto;padding:1rem;">
+  <h1>Could not load this gallery link</h1>
+  <p>This share link is invalid or expired. If you just copied it, the server may need a fixed secret so links work across restarts.</p>
+  <p><strong>If you're the owner:</strong> Set <code>FLASK_SECRET_KEY</code> or <code>GALLERY_SHARE_SECRET</code> in your backend environment (e.g. Railway variables), then open the gallery again and copy a new link.</p>
+  <p><a href="/connect" style="display:inline-block;padding:10px 16px;background:#06c;color:#fff;text-decoration:none;border-radius:6px;">Go to connect</a></p>
+</body>
+</html>
+"""
+
 
 def _get_gallery_data(
     key: str,
@@ -915,7 +931,7 @@ def gallery_full():
     if share_token:
         parsed = _verify_gallery_share_token(share_token)
         if not parsed:
-            return render_template_string(GALLERY_ERROR_HTML), 404
+            return render_template_string(GALLERY_SHARE_ERROR_HTML), 200
         key, category_param = parsed
         category_id = None if category_param.upper() == "ALL" else category_param
         listing_filters = {}
@@ -949,10 +965,14 @@ def gallery_full():
     try:
         html = _render_gallery_full(key, category_id, listing_filters, share_url=share_url)
     except ValueError:
+        if share_token:
+            return render_template_string(GALLERY_SHARE_ERROR_HTML), 200
         return render_template_string(GALLERY_ERROR_HTML), 404
     except Exception as e:
         return f"Failed to load items: {e}", 500
     if not html:
+        if share_token:
+            return render_template_string(GALLERY_SHARE_ERROR_HTML), 200
         return render_template_string(GALLERY_ERROR_HTML), 404
     return html
 

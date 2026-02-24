@@ -41,6 +41,8 @@ Connection keys and shared (store) API keys are stored in the **backend** databa
   - The app will create the file on the volume; it will persist across deploys.
 - **Elsewhere:** Set `CONNECTIONS_DB` to a path that is on a persistent disk (not the app’s default directory).
 
+**Gallery "Copy link":** For shared gallery links to work (e.g. after a restart or with multiple workers), set **`FLASK_SECRET_KEY`** or **`GALLERY_SHARE_SECRET`** in your backend environment (e.g. Railway variables). Otherwise the signer secret can differ per process and copied links may show "Could not load gallery".
+
 ---
 
 ## Project layout

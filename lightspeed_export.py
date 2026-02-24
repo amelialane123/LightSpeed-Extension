@@ -267,11 +267,19 @@ class SessionWithRefresh:
         self._session.headers["Authorization"] = f"Bearer {self._access_token}"
 
     def _refresh(self) -> None:
-        data = refresh_oauth_token(
-            self._refresh_token,
-            self._client_id,
-            self._client_secret,
-        )
+        try:
+            data = refresh_oauth_token(
+                self._refresh_token,
+                self._client_id,
+                self._client_secret,
+            )
+        except requests.exceptions.HTTPError:
+            print(
+                "Lightspeed sign-in has expired or was revoked. Please reconnect: "
+                "open the extension options, click Reconnect, and complete the connection flow again.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         self._access_token = data["access_token"]
         if data.get("refresh_token"):
             self._refresh_token = data["refresh_token"]

@@ -278,8 +278,11 @@ def _ensure_fresh_tokens(conn_id: str) -> tuple[str, str]:
         if data.get("refresh_token"):
             refresh_token = data["refresh_token"]
         _update_connection_tokens(conn_id, access_token, refresh_token)
-    except Exception:
-        pass  # use existing tokens; export may still work
+    except Exception as e:
+        raise ValueError(
+            "Lightspeed sign-in has expired or was revoked. Please reconnect: "
+            "open the extension options, click Reconnect, and complete the connection flow again."
+        ) from e
     return access_token, refresh_token
 
 

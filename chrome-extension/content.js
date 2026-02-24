@@ -49,7 +49,9 @@
     chrome.runtime.sendMessage({ action: 'runExport', categoryId: categoryId }, function (res) {
       if (res && !res.ok) {
         var msg = res.error || 'Export failed';
-        if (res.output && res.output.trim()) {
+        if (msg.includes('Reconnect') || msg.includes('reconnect')) {
+          msg = "Lightspeed sign-in expired or was revoked. We've opened the reconnect page—complete the steps there to sign in again, then try exporting again.";
+        } else if (res.output && res.output.trim()) {
           var out = res.output.trim();
           if (out.length > 500) out = out.slice(-500);
           msg += '\n\n' + out;

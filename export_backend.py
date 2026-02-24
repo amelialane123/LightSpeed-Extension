@@ -450,11 +450,6 @@ GALLERY_LOADING_HTML = """<!DOCTYPE html>
       margin: 0 0 1.5rem;
       color: #555;
     }
-    .dots {
-      display: inline-block;
-      min-width: 1.5em;
-      text-align: left;
-    }
     .spinner {
       width: 40px;
       height: 40px;
@@ -473,15 +468,12 @@ GALLERY_LOADING_HTML = """<!DOCTYPE html>
   <div class="loading-box">
     <div class="spinner" aria-hidden="true"></div>
     <h2>Loading your gallery</h2>
-    <p>This may take a moment<span class="dots"></span></p>
+    <p>This may take a moment.</p>
   </div>
   <script>
     (function() {
       var fullUrl = {{ gallery_full_url | tojson }};
       if (!fullUrl) fullUrl = window.location.origin + '/gallery/full' + window.location.search;
-      var dotsEl = document.querySelector('.dots');
-      var n = 0;
-      if (dotsEl) setInterval(function() { n++; dotsEl.textContent = '.'.repeat((n % 3) + 1); }, 400);
       fetch(fullUrl)
         .then(function(r) {
           if (!r.ok) throw new Error(r.statusText);
@@ -624,6 +616,29 @@ GALLERY_HTML = """<!DOCTYPE html>
       margin-right: 4px;
     }
     .card-detail:last-child { margin-bottom: 0; }
+    .gallery.cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .gallery.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .gallery.cols-4 { grid-template-columns: repeat(4, 1fr); }
+    .gallery.cols-5 { grid-template-columns: repeat(5, 1fr); }
+    .cards-per-row-wrap {
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .cards-per-row-wrap label { font-size: 14px; font-weight: 500; margin: 0; }
+    .cards-per-row-wrap .btn-group { display: flex; gap: 4px; }
+    .cards-per-row-wrap .layout-btn {
+      padding: 6px 12px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .cards-per-row-wrap .layout-btn:hover { background: #f0f0f0; }
+    .cards-per-row-wrap .layout-btn.active { background: #06c; color: #fff; border-color: #06c; }
     .share-popup-item {
       display: block;
       width: 100%;
@@ -641,6 +656,7 @@ GALLERY_HTML = """<!DOCTYPE html>
     @media print {
       body { margin: 0; background: #fff; }
       .share-export-wrap { display: none !important; }
+      .cards-per-row-wrap { display: none !important; }
       h1 { margin-bottom: 0.5rem; }
       .gallery { gap: 0.75rem; }
       .card {
@@ -669,7 +685,17 @@ GALLERY_HTML = """<!DOCTYPE html>
     </div>
   </div>
   {% endif %}
-  <div class="gallery">
+  <div class="cards-per-row-wrap">
+    <label for="layout-btns">Cards per row (for print):</label>
+    <div class="btn-group" id="layout-btns" role="group">
+      <button type="button" class="layout-btn active" data-cols="auto">Auto</button>
+      <button type="button" class="layout-btn" data-cols="2">2</button>
+      <button type="button" class="layout-btn" data-cols="3">3</button>
+      <button type="button" class="layout-btn" data-cols="4">4</button>
+      <button type="button" class="layout-btn" data-cols="5">5</button>
+    </div>
+  </div>
+  <div class="gallery" id="gallery-grid">
     {% for item in items %}
     <div class="card" data-card-index="{{ loop.index0 }}">
       <div class="card-image-wrap">
@@ -728,6 +754,18 @@ GALLERY_HTML = """<!DOCTYPE html>
       }
       prevBtn.addEventListener('click', function() { goTo(current - 1); });
       nextBtn.addEventListener('click', function() { goTo(current + 1); });
+    });
+    var galleryEl = document.getElementById('gallery-grid');
+    document.querySelectorAll('.layout-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.layout-btn').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+        var cols = this.getAttribute('data-cols');
+        if (galleryEl) {
+          galleryEl.classList.remove('cols-2', 'cols-3', 'cols-4', 'cols-5');
+          if (cols !== 'auto') galleryEl.classList.add('cols-' + cols);
+        }
+      });
     });
     var shareBtn = document.getElementById('share-export-btn');
     var popup = document.getElementById('share-export-popup');

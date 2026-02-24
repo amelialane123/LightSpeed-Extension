@@ -490,6 +490,20 @@ GALLERY_HTML = """<!DOCTYPE html>
 """
 
 
+GALLERY_ERROR_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Connection not found</title></head>
+<body style="font-family:system-ui,sans-serif;max-width:480px;margin:3rem auto;padding:1rem;">
+  <h1>Connection not found</h1>
+  <p>Your connection key is no longer in our database. This often happens after the server restarts (e.g. on Railway) if the database isn’t stored on persistent disk.</p>
+  <p><strong>Fix:</strong> Reconnect once to create a new connection, then use the extension again.</p>
+  <p><a href="/connect" style="display:inline-block;padding:10px 16px;background:#06c;color:#fff;text-decoration:none;border-radius:6px;">Reconnect now</a></p>
+  <p style="color:#666;font-size:14px;">Or open the extension options and click “Reconnect”.</p>
+</body>
+</html>
+"""
+
+
 @app.route("/gallery")
 def gallery_page():
     """Printable gallery view of items (category + descendants). No Airtable key required."""
@@ -498,13 +512,13 @@ def gallery_page():
     category_id = category_id_param if category_id_param and category_id_param.upper() != "ALL" else None
     if not key:
         return "Missing key. Use the extension to open the gallery.", 400
+    row = _get_connection(key)
+    if not row:
+        return render_template_string(GALLERY_ERROR_HTML), 404
     try:
         access_token, refresh_token = _ensure_fresh_tokens(key)
     except ValueError as e:
-        return str(e), 403
-    row = _get_connection(key)
-    if not row:
-        return "Connection not found. Reconnect at /connect.", 404
+        return render_template_string(GALLERY_ERROR_HTML), 404
     client_id = ls.env("LIGHTSPEED_CLIENT_ID")
     client_secret = ls.env("LIGHTSPEED_CLIENT_SECRET")
     if not client_id or not client_secret:

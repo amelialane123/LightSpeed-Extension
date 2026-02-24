@@ -321,6 +321,9 @@ def api_run():
     listing_filters = data.get("listing_filters")
     if not isinstance(listing_filters, dict):
         listing_filters = {}
+    if data.get("qoh_positive_only") is True:
+        listing_filters["qoh_positive"] = "on"
+        listing_filters["qoh_zero"] = "off"
     if not connection_id:
         return jsonify({"success": False, "error": "Missing connection_id. Add your connection key in the extension options."}), 200
     try:
@@ -895,9 +898,9 @@ def gallery_page():
     """Returns loading shell immediately; client fetches /gallery/full for actual content."""
     key = (request.args.get("key") or "").strip()
     if not key:
-        return "Missing key. Use the extension to open the gallery.", 400
+        return redirect(url_for("connect_page"))
     if not _get_connection(key):
-        return render_template_string(GALLERY_ERROR_HTML), 404
+        return redirect(url_for("connect_page"))
     return render_template_string(
         GALLERY_LOADING_HTML,
         share_token=None,
@@ -929,6 +932,12 @@ def gallery_full():
                     listing_filters = {}
         except (json.JSONDecodeError, TypeError):
             pass
+        if (request.args.get("qoh_positive_only") or "").strip().lower() in ("1", "true", "yes"):
+            listing_filters["qoh_positive"] = "on"
+            listing_filters["qoh_zero"] = "off"
+            shop = (request.args.get("shop_id") or "").strip()
+            if shop and shop != "-1":
+                listing_filters["shop_id"] = shop
         share_url = None
         try:
             token = _create_gallery_share_token(key, category_id)

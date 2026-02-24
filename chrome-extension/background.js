@@ -32,6 +32,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         return;
       }
       let url = API_BASE + '/gallery?key=' + encodeURIComponent(connectionId) + '&category_id=' + encodeURIComponent(categoryId);
+      if ((listingFilters.qoh_positive || '').toLowerCase() === 'on' && (listingFilters.qoh_zero || '').toLowerCase() === 'off') {
+        url += '&qoh_positive_only=1';
+        if ((listingFilters.shop_id || '').trim() && (listingFilters.shop_id || '').trim() !== '-1') {
+          url += '&shop_id=' + encodeURIComponent((listingFilters.shop_id || '').trim());
+        }
+      }
       if (Object.keys(listingFilters).length) url += '&listing_filters=' + encodeURIComponent(JSON.stringify(listingFilters));
       chrome.tabs.create({ url: url });
       sendResponse({ ok: true });
@@ -49,6 +55,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     const body = { category_id: categoryId };
     if (connectionId) body.connection_id = connectionId;
     if (Object.keys(listingFilters).length) body.listing_filters = listingFilters;
+    if ((listingFilters.qoh_positive || '').toLowerCase() === 'on' && (listingFilters.qoh_zero || '').toLowerCase() === 'off') {
+      body.qoh_positive_only = true;
+    }
     fetch(API_BASE + '/api/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

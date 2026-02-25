@@ -126,7 +126,13 @@ document.getElementById('get-started').onclick = function () {
 var reconnectEl = document.getElementById('reconnect-link');
 if (reconnectEl) reconnectEl.addEventListener('click', function (e) {
   e.preventDefault();
-  chrome.tabs.create({ url: API_BASE + '/connect' });
+  chrome.storage.sync.get(['connection_id'], function (data) {
+    var connectionId = (data && data.connection_id) ? data.connection_id.trim() : '';
+    var url = connectionId
+      ? API_BASE + '/connect?key=' + encodeURIComponent(connectionId)
+      : API_BASE + '/connect';
+    chrome.tabs.create({ url: url });
+  });
 });
 
 document.getElementById('base-url-save').addEventListener('click', function () {

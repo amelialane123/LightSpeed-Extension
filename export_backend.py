@@ -1152,6 +1152,41 @@ CONNECT_HTML = """
 </html>
 """
 
+RECONNECT_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Reconnect Lightspeed</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 520px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    .muted { color: #666; font-size: 0.9rem; margin: 0.5rem 0; }
+    button { padding: 0.5rem 1rem; background: #0a0; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-top: 0.75rem; font-size: 1rem; }
+    button:hover { background: #080; }
+    a { color: #06c; }
+    .summary { background: #f5f5f5; padding: 0.75rem 1rem; border-radius: 6px; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Reconnect your Lightspeed sign-in</h1>
+  <p>We'll keep your existing Airtable base, table name, and export settings. You only need to sign in to Lightspeed again.</p>
+  <div class="summary">
+    <p class="muted" style="margin: 0;"><strong>Account ID:</strong> {{ account_id }}</p>
+    <p class="muted" style="margin: 0.25rem 0 0;"><strong>Airtable base:</strong> {{ airtable_base_id }}</p>
+  </div>
+  <form method="post" action="/connect/start">
+    <input type="hidden" name="reconnect_connection_id" value="{{ connection_id }}">
+    <input type="hidden" name="account_id" value="{{ account_id }}">
+    <input type="hidden" name="airtable_base_id" value="{{ airtable_base_id }}">
+    <input type="hidden" name="airtable_table_name" value="{{ airtable_table_name }}">
+    <button type="submit">Sign in to Lightspeed again</button>
+  </form>
+  <p class="muted" style="margin-top: 1.5rem;"><a href="/connect">Start a new connection instead</a></p>
+</body>
+</html>
+"""
+
 CONNECT_ENTER_DETAILS_HTML = """
 <!DOCTYPE html>
 <html>
@@ -1407,8 +1442,28 @@ def privacy_page():
 
 @app.route("/connect", methods=["GET"])
 def connect_page():
+    key = (request.args.get("key") or "").strip()
+    if key and _get_connection(key):
+        return redirect(url_for("connect_reconnect_page", key=key))
     shared_keys = _list_shared_keys()
     return render_template_string(CONNECT_HTML, shared_keys=shared_keys, error=request.args.get("error"))
+
+
+@app.route("/connect/reconnect", methods=["GET"])
+def connect_reconnect_page():
+    key = (request.args.get("key") or "").strip()
+    if not key:
+        return redirect(url_for("connect_page"))
+    row = _get_connection(key)
+    if not row:
+        return redirect(url_for("connect_page", error="Connection not found. You can start a new connection below."))
+    return render_template_string(
+        RECONNECT_HTML,
+        connection_id=key,
+        account_id=row["account_id"] or "",
+        airtable_base_id=row["airtable_base_id"] or "",
+        airtable_table_name=row["airtable_table_name"] or "Items",
+    )
 
 
 @app.route("/connect/verify-shared-key", methods=["POST"])
@@ -1444,6 +1499,37 @@ def connect_enter_details():
 
 @app.route("/connect/start", methods=["POST"])
 def connect_start():
+    reconnect_connection_id = (request.form.get("reconnect_connection_id") or "").strip()
+    if reconnect_connection_id:
+        row = _get_connection(reconnect_connection_id)
+        if not row:
+            return redirect(url_for("connect_page", error="Connection not found. Start a new connection below."))
+        account_id = (row["account_id"] or "").strip()
+        airtable_base_id = (row["airtable_base_id"] or "").strip()
+        airtable_table_name = (row["airtable_table_name"] or "").strip() or "Items"
+        airtable_api_key = (row["airtable_api_key"] or "").strip()
+        client_id = ls.env("LIGHTSPEED_CLIENT_ID")
+        client_secret = ls.env("LIGHTSPEED_CLIENT_SECRET")
+        if not client_id or not client_secret:
+            return redirect(url_for("connect_page", error="Server missing Lightspeed client credentials."))
+        redirect_uri = _oauth_redirect_uri()
+        state = secrets.token_urlsafe(24)
+        pending_connect = {
+            "state": state,
+            "redirect_uri": redirect_uri,
+            "account_id": account_id,
+            "airtable_base_id": airtable_base_id,
+            "airtable_table_name": airtable_table_name,
+            "airtable_api_key": airtable_api_key,
+            "reconnect_connection_id": reconnect_connection_id,
+        }
+        session["pending_connect"] = pending_connect
+        auth_url = (
+            f"{ls.AUTHORIZE_URL}?response_type=code&client_id={quote(client_id, safe='')}"
+            f"&scope=employee:all&state={quote(state, safe='')}&redirect_uri={quote(redirect_uri, safe='')}"
+        )
+        return redirect(auth_url)
+
     account_id = (request.form.get("account_id") or "").strip()
     airtable_input = (
         (request.form.get("airtable_base_url") or request.form.get("airtable_base_id") or "").strip()
@@ -1543,6 +1629,11 @@ def connect_paste():
         data = ls.exchange_code_for_tokens(code, client_id, client_secret, redirect_uri)
     except Exception as e:
         return render_template_string(CONNECT_HTML, shared_keys=_list_shared_keys(), error=f"Token exchange failed: {e}")
+    reconnect_id = pending.get("reconnect_connection_id")
+    if reconnect_id:
+        _update_connection_tokens(reconnect_id, data["access_token"], data["refresh_token"])
+        session.pop("pending_connect", None)
+        return redirect(url_for("connect_success", key=reconnect_id))
     conn_id = _create_connection(
         access_token=data["access_token"],
         refresh_token=data["refresh_token"],
@@ -1581,6 +1672,11 @@ def connect_callback():
     except Exception as e:
         session.pop("pending_connect", None)
         return render_template_string(CONNECT_HTML, shared_keys=_list_shared_keys(), error=f"Token exchange failed: {e}"), 200
+    reconnect_id = pending.get("reconnect_connection_id")
+    if reconnect_id:
+        _update_connection_tokens(reconnect_id, data["access_token"], data["refresh_token"])
+        session.pop("pending_connect", None)
+        return redirect(url_for("connect_success", key=reconnect_id))
     conn_id = _create_connection(
         access_token=data["access_token"],
         refresh_token=data["refresh_token"],

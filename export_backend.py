@@ -485,16 +485,26 @@ GALLERY_LOADING_HTML = """<!DOCTYPE html>
         : (window.location.origin + '/gallery/full' + window.location.search);
       fetch(fullUrl)
         .then(function(r) {
-          if (!r.ok) throw new Error(r.statusText);
+          if (!r.ok) {
+            var params = new URLSearchParams(window.location.search);
+            var key = params.get('key');
+            var reconnectUrl = key ? (window.location.origin + '/connect?key=' + encodeURIComponent(key)) : (window.location.origin + '/connect');
+            window.location.replace(reconnectUrl);
+            return;
+          }
           return r.text();
         })
         .then(function(html) {
+          if (!html) return;
           document.open();
           document.write(html);
           document.close();
         })
         .catch(function(err) {
-          document.querySelector('.loading-box').innerHTML = '<h2>Could not load gallery</h2><p>' + (err.message || 'Something went wrong.') + '</p><p><a href="' + window.location.pathname + '">Try again</a></p>';
+          var params = new URLSearchParams(window.location.search);
+          var key = params.get('key');
+          var reconnectUrl = key ? (window.location.origin + '/connect?key=' + encodeURIComponent(key)) : (window.location.origin + '/connect');
+          window.location.replace(reconnectUrl);
         });
     })();
   </script>

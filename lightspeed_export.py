@@ -1008,21 +1008,29 @@ def row_to_airtable_fields(row: dict, field_ids: list[str] | None = None) -> dic
             out[f["displayName"]] = text_val
         elif text_val:
             out[f["displayName"]] = text_val
+    # Ensure Image URL column is always sent when Image is selected (for CSV/Canva)
+    if "image" in ids and "Image URL" not in out:
+        out["Image URL"] = (str(row.get("image_url") or "")).strip()
     return out
 
 
 def _build_table_schema(field_ids: list[str] | None = None) -> list[dict]:
-    """Build Airtable table fields schema for create API."""
+    """Build Airtable table fields schema for create API. Always includes Image URL when Image is selected (for CSV/Canva)."""
     ids = field_ids or _field_ids_from_env()
     fields_spec = _fields_for_ids(ids)
     schema: list[dict] = []
+    seen_image_url = False
     for f in fields_spec:
+        if f["id"] == "image_url":
+            seen_image_url = True
         if f["type"] == "number":
             schema.append({"name": f["displayName"], "type": "number", "options": {"precision": 0}})
         elif f["type"] == "multipleAttachments":
             schema.append({"name": f["displayName"], "type": "multipleAttachments"})
         else:
             schema.append({"name": f["displayName"], "type": "singleLineText"})
+    if "image" in ids and not seen_image_url:
+        schema.append({"name": "Image URL", "type": "singleLineText"})
     return schema
 
 

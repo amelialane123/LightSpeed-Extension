@@ -1703,7 +1703,8 @@ def settings_page():
         return "Missing key. Open /settings?key=YOUR_CONNECTION_KEY", 400
     if not _get_connection(key):
         return "Invalid or expired connection key.", 404
-    available = ls.AVAILABLE_FIELDS
+    # Hide "Image URL" from the list; it is added automatically when "Image" is selected (for CSV/Canva-friendly links)
+    available = [f for f in ls.AVAILABLE_FIELDS if f["id"] != "image_url"]
     selected_ids = set(_get_selected_fields(key))
     if request.method == "POST":
         chosen = request.form.getlist("field")

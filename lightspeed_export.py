@@ -612,6 +612,7 @@ def item_to_row(
     if include_images:
         urls = get_image_urls(item)
         row["image_urls"] = " | ".join(urls) if urls else ""
+        row["image_url"] = urls[0] if urls else ""
         row["image_count"] = len(urls)
     return row
 
@@ -931,6 +932,7 @@ AVAILABLE_FIELDS = [
     {"id": "price", "displayName": "Price", "type": "number", "rowKey": "price"},
     {"id": "vendor_name", "displayName": "Vendor Name", "type": "singleLineText", "rowKey": "vendor_name"},
     {"id": "image", "displayName": "Image", "type": "multipleAttachments", "rowKey": "image_urls"},
+    {"id": "image_url", "displayName": "Image URL", "type": "singleLineText", "rowKey": "image_url"},
     {"id": "itemID", "displayName": "Item ID", "type": "singleLineText", "rowKey": "itemID"},
     {"id": "systemSku", "displayName": "System SKU", "type": "singleLineText", "rowKey": "systemSku"},
     {"id": "customSku", "displayName": "Custom SKU", "type": "singleLineText", "rowKey": "customSku"},
@@ -973,9 +975,12 @@ def _field_ids_from_env() -> list[str]:
 
 
 def _fields_for_ids(ids: list[str]) -> list[dict]:
-    """Return AVAILABLE_FIELDS entries for given ids, preserving order."""
+    """Return AVAILABLE_FIELDS entries for given ids, preserving order. When 'image' is selected, 'image_url' is included so CSV export has a direct link for Canva etc."""
     by_id = {f["id"]: f for f in AVAILABLE_FIELDS}
-    return [by_id[i] for i in ids if i in by_id]
+    out = [by_id[i] for i in ids if i in by_id]
+    if "image" in ids and "image_url" not in ids:
+        out.append(by_id["image_url"])
+    return out
 
 
 def row_to_airtable_fields(row: dict, field_ids: list[str] | None = None) -> dict:

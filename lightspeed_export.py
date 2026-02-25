@@ -984,29 +984,30 @@ def _fields_for_ids(ids: list[str]) -> list[dict]:
 
 
 def row_to_airtable_fields(row: dict, field_ids: list[str] | None = None) -> dict:
-    """Build Airtable fields dict. Uses field_ids or AIRTABLE_FIELDS env; defaults to Name, Cost, Price, Vendor Name, Image."""
+    """Build Airtable fields dict. Uses field_ids or AIRTABLE_FIELDS env; defaults to Name, Cost, Price, Vendor Name, Image. Image URL (for CSV/Canva) is always sent when Image is selected."""
     ids = field_ids or _field_ids_from_env()
     fields_spec = _fields_for_ids(ids)
     out: dict = {}
     for f in fields_spec:
         key = f["rowKey"]
         val = row.get(key)
-        if val is None or (isinstance(val, str) and not val.strip()):
-            if f["type"] == "number":
-                num = _to_number(str(val or ""))
-                if num is not None:
-                    out[f["displayName"]] = num
-            continue
         if f["type"] == "number":
-            num = _to_number(str(val))
+            num = _to_number(str(val or "")) if val is not None else _to_number(str(row.get(key) or ""))
             if num is not None:
                 out[f["displayName"]] = num
-        elif f["type"] == "multipleAttachments":
+            continue
+        if f["type"] == "multipleAttachments":
             urls = [u.strip() for u in (str(val or "").split("|")) if u.strip()]
             if urls:
                 out[f["displayName"]] = [{"url": u} for u in urls]
-        else:
-            out[f["displayName"]] = (str(val) or "").strip()
+            continue
+        # singleLineText (including Image URL)
+        text_val = (str(val or "").strip()) if val is not None else ""
+        if key == "image_url":
+            # Always send Image URL when in spec so the column is populated for CSV/Canva (empty string if no image)
+            out[f["displayName"]] = text_val
+        elif text_val:
+            out[f["displayName"]] = text_val
     return out
 
 

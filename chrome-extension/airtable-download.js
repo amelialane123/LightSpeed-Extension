@@ -10,6 +10,26 @@
     return null;
   }
 
+  /** Get table name from the Airtable page (title or DOM). Fallback to null so caller can use "Airtable Images". */
+  function getTableNameFromPage() {
+    const title = (document.title || '').trim();
+    if (title) {
+      const parts = title.split(/\s*[|\-–—]\s*/);
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i].trim();
+        if (part && part.toLowerCase() !== 'airtable' && part.length > 0 && part.length < 200) {
+          return part;
+        }
+      }
+    }
+    var tableLabel = document.querySelector('[data-testid="table-name"], .tableName, [class*="tableName"]');
+    if (tableLabel && tableLabel.textContent) {
+      const t = tableLabel.textContent.trim();
+      if (t && t.length < 200) return t;
+    }
+    return null;
+  }
+
   function ensureButton() {
     if (!document.body) return;
     if (document.getElementById('ls-airtable-download-wrap')) return;
@@ -61,7 +81,7 @@
         .then(function (r) { return r.json(); })
         .then(function (res) {
           if (res.success && res.urls && res.urls.length > 0) {
-            var tableName = sanitizeFolderName(res.table_name || 'Airtable Images');
+            var tableName = sanitizeFolderName(getTableNameFromPage() || res.table_name || 'Airtable Images');
             var storageKey = 'ls_download_folder_count_' + ids.tableId;
             chrome.storage.local.get([storageKey], function (local) {
               var count = parseInt(local[storageKey], 10) || 0;

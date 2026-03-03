@@ -44,6 +44,25 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     });
     return true;
   }
+  if (msg.action === 'downloadAirtableImages') {
+    const urls = msg.urls || [];
+    const folderName = (msg.folderName || 'Airtable_Images').replace(/[\/\\:*?"<>|]/g, '_');
+    if (urls.length === 0) {
+      sendResponse({ ok: true });
+      return true;
+    }
+    let done = 0;
+    urls.forEach(function (item, index) {
+      const filename = (folderName + '/' + (item.filename || 'image_' + index + '.jpg')).replace(/\/+/g, '/');
+      setTimeout(function () {
+        chrome.downloads.download({ url: item.url, filename: filename }, function () {
+          done++;
+        });
+      }, index * 80);
+    });
+    sendResponse({ ok: true });
+    return true;
+  }
   if (msg.action !== 'runExport') {
     sendResponse({ ok: false, error: 'Unknown action' });
     return true;

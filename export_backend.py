@@ -22,6 +22,7 @@ import uuid
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
 
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -1800,6 +1801,85 @@ def api_connection_update_base():
     if _update_connection_base(connection_id, airtable_base_url):
         return jsonify({"success": True})
     return jsonify({"success": False, "error": "Invalid Airtable base URL"}), 200
+
+
+AIRTABLE_API_BASE = "https://api.airtable.com/v0"
+
+
+def _airtable_fetch_image_urls(api_key: str, base_id: str, table_id: str) -> list[dict]:
+    """Fetch all records from base/table and return list of {url, filename} for the Image (or first attachment) field."""
+    all_urls: list[dict] = []
+    url = f"{AIRTABLE_API_BASE}/{quote(base_id)}/{quote(table_id)}"
+    params: dict = {}
+    attachment_field_name: str | None = None
+    while True:
+        resp = requests.get(
+            url,
+            params=params,
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=30,
+        )
+        if not resp.ok:
+            err = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+            msg = (err.get("error") or {}).get("message", resp.text) if isinstance(err.get("error"), dict) else resp.text
+            raise ValueError(msg)
+        data = resp.json()
+        records = data.get("records") or []
+        for rec in records:
+            fields = rec.get("fields") or {}
+            if attachment_field_name is None:
+                candidates = []
+                for fn, val in fields.items():
+                    if isinstance(val, list) and val and isinstance(val[0], dict) and "url" in val[0]:
+                        candidates.append(fn)
+                if candidates:
+                    attachment_field_name = "Image" if "Image" in candidates else candidates[0]
+                if attachment_field_name is None:
+                    continue
+            val = fields.get(attachment_field_name)
+            if not isinstance(val, list):
+                continue
+            for i, att in enumerate(val):
+                if isinstance(att, dict) and att.get("url"):
+                    filename = (att.get("filename") or f"record_{rec.get('id', '')}_{i}.jpg").strip()
+                    if not filename or filename.startswith("."):
+                        filename = f"image_{len(all_urls)}.jpg"
+                    for c in ('/', '\\', ':', '*', '?', '"', '<', '>', '|'):
+                        filename = filename.replace(c, "_")
+                    all_urls.append({"url": att["url"].strip(), "filename": filename})
+        offset = data.get("offset")
+        if not offset:
+            break
+        params = {"offset": offset}
+    return all_urls
+
+
+@app.route("/api/airtable/image-urls", methods=["GET", "POST"])
+def api_airtable_image_urls():
+    """Return list of image URLs from an Airtable table for the extension to download. Query or JSON: connection_id, base_id, table_id."""
+    if request.method == "GET":
+        connection_id = (request.args.get("connection_id") or "").strip()
+        base_id = (request.args.get("base_id") or "").strip()
+        table_id = (request.args.get("table_id") or "").strip()
+    else:
+        data = request.get_json() or {}
+        connection_id = (data.get("connection_id") or "").strip()
+        base_id = (data.get("base_id") or "").strip()
+        table_id = (data.get("table_id") or "").strip()
+    if not connection_id or not base_id or not table_id:
+        return jsonify({"success": False, "error": "Missing connection_id, base_id, or table_id"}), 200
+    if not _get_connection(connection_id):
+        return jsonify({"success": False, "error": "Connection not found"}), 200
+    api_key = _get_airtable_key_for_connection(connection_id)
+    if not api_key:
+        return jsonify({"success": False, "error": "No Airtable API key for this connection"}), 200
+    try:
+        urls = _airtable_fetch_image_urls(api_key, base_id, table_id)
+        return jsonify({"success": True, "urls": urls})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 200
 
 
 @app.route("/settings", methods=["GET", "POST"])

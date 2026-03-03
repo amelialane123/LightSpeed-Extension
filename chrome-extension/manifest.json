@@ -8,6 +8,7 @@
   "host_permissions": [
     "https://*.lightspeedapp.com/*",
     "https://*.merchantos.com/*",
+    "https://airtable.com/*",
     "https://*.airtable.com/*",
     "https://*.airtableusercontent.com/*",
     "http://127.0.0.1:5050/*",
@@ -16,7 +17,7 @@
   "options_ui": {"page": "options.html"},
   "content_scripts": [
     {"matches": ["https://*.lightspeedapp.com/*", "https://*.merchantos.com/*"], "js": ["content.js"], "css": ["content.css"], "run_at": "document_idle"},
-    {"matches": ["https://*.airtable.com/*"], "js": ["airtable-download.js"], "run_at": "document_idle"},
+    {"matches": ["https://airtable.com/*", "https://*.airtable.com/*"], "js": ["airtable-download.js"], "run_at": "document_idle"},
     {"matches": ["https://lightspeed-extension-production.up.railway.app/connect/success*"], "js": ["connect-success.js"], "run_at": "document_idle"}
   ]
 }

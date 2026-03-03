@@ -11,6 +11,7 @@
   }
 
   function ensureButton() {
+    if (!document.body) return;
     if (document.getElementById('ls-airtable-download-wrap')) return;
     const wrap = document.createElement('div');
     wrap.id = 'ls-airtable-download-wrap';
@@ -99,10 +100,18 @@
     }
   }
 
-  init();
-  const observer = new MutationObserver(function () {
-    if (document.getElementById('ls-airtable-download-wrap')) return;
+  function startObserver() {
+    if (!document.body) {
+      setTimeout(startObserver, 50);
+      return;
+    }
     ensureButton();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+    const observer = new MutationObserver(function () {
+      if (document.getElementById('ls-airtable-download-wrap')) return;
+      ensureButton();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+  init();
+  startObserver();
 })();

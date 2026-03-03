@@ -1841,11 +1841,15 @@ def _airtable_fetch_image_urls(api_key: str, base_id: str, table_id: str) -> lis
                 continue
             for i, att in enumerate(val):
                 if isinstance(att, dict) and att.get("url"):
-                    filename = (att.get("filename") or f"record_{rec.get('id', '')}_{i}.jpg").strip()
+                    filename = (att.get("filename") or f"record_{rec.get('id', '')}_{i}").strip()
                     if not filename or filename.startswith("."):
-                        filename = f"image_{len(all_urls)}.jpg"
+                        filename = f"image_{len(all_urls)}"
                     for c in ('/', '\\', ':', '*', '?', '"', '<', '>', '|'):
                         filename = filename.replace(c, "_")
+                    # Ensure extension so OS opens as image (Airtable often serves PNG with no extension)
+                    lower = filename.lower()
+                    if not any(lower.endswith(ext) for ext in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg')):
+                        filename = filename + ".png"
                     all_urls.append({"url": att["url"].strip(), "filename": filename})
         offset = data.get("offset")
         if not offset:

@@ -51,13 +51,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       sendResponse({ ok: true });
       return true;
     }
-    let done = 0;
+    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'];
+    function ensureImageExtension(name) {
+      var lower = (name || '').toLowerCase();
+      for (var e = 0; e < imageExtensions.length; e++) {
+        if (lower.indexOf(imageExtensions[e]) === lower.length - imageExtensions[e].length) return name;
+      }
+      return name + '.png';
+    }
     urls.forEach(function (item, index) {
-      const filename = (folderName + '/' + (item.filename || 'image_' + index + '.jpg')).replace(/\/+/g, '/');
+      var baseName = item.filename || ('image_' + index);
+      var withExt = ensureImageExtension(baseName);
+      var filename = (folderName + '/' + withExt).replace(/\/+/g, '/');
       setTimeout(function () {
-        chrome.downloads.download({ url: item.url, filename: filename }, function () {
-          done++;
-        });
+        chrome.downloads.download({ url: item.url, filename: filename }, function () {});
       }, index * 80);
     });
     sendResponse({ ok: true });

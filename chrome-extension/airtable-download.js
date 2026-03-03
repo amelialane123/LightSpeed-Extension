@@ -28,6 +28,10 @@
     document.body.appendChild(wrap);
   }
 
+  function sanitizeFolderName(name) {
+    return (name || '').replace(/[\/\\:*?"<>|]/g, '_').trim() || 'Airtable Images';
+  }
+
   function runDownload() {
     const ids = getBaseAndTableFromUrl();
     if (!ids) {
@@ -57,16 +61,24 @@
         .then(function (r) { return r.json(); })
         .then(function (res) {
           if (res.success && res.urls && res.urls.length > 0) {
-            chrome.runtime.sendMessage({
-              action: 'downloadAirtableImages',
-              urls: res.urls,
-              folderName: 'Airtable_Images'
-            }, function () {
-              if (btn) {
-                btn.disabled = false;
-                btn.textContent = 'Download images to folder';
-              }
-              alert('Downloading ' + res.urls.length + ' image(s) into folder "Airtable_Images" in your Downloads.');
+            var tableName = sanitizeFolderName(res.table_name || 'Airtable Images');
+            var storageKey = 'ls_download_folder_count_' + ids.tableId;
+            chrome.storage.local.get([storageKey], function (local) {
+              var count = parseInt(local[storageKey], 10) || 0;
+              var folderName = count === 0 ? tableName : tableName + ' ' + (count + 1);
+              chrome.storage.local.set({ [storageKey]: count + 1 }, function () {
+                chrome.runtime.sendMessage({
+                  action: 'downloadAirtableImages',
+                  urls: res.urls,
+                  folderName: folderName
+                }, function () {
+                  if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Download images to folder';
+                  }
+                  alert('Downloading ' + res.urls.length + ' image(s) into folder "' + folderName + '" in your Downloads.');
+                });
+              });
             });
           } else if (res.success && (!res.urls || res.urls.length === 0)) {
             if (btn) {

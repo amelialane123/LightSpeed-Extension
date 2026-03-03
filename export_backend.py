@@ -1804,6 +1804,30 @@ def api_connection_update_base():
 
 
 AIRTABLE_API_BASE = "https://api.airtable.com/v0"
+AIRTABLE_META_BASE = "https://api.airtable.com/v0/meta"
+
+
+def _airtable_table_name(api_key: str, base_id: str, table_id: str) -> str:
+    """Return table name for the given base and table id; falls back to table_id if meta API fails."""
+    try:
+        resp = requests.get(
+            f"{AIRTABLE_META_BASE}/bases/{quote(base_id)}/tables",
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=10,
+        )
+        if resp.ok:
+            data = resp.json()
+            for t in (data.get("tables") or []):
+                if (t.get("id") or "").strip() == table_id:
+                    name = (t.get("name") or "").strip()
+                    if name:
+                        return name
+    except Exception:
+        pass
+    # If we only have table id (e.g. meta API failed), use a friendly default
+    if (table_id or "").strip().startswith("tbl"):
+        return "Airtable Images"
+    return table_id
 
 
 def _airtable_fetch_image_urls(api_key: str, base_id: str, table_id: str) -> list[dict]:
@@ -1878,8 +1902,9 @@ def api_airtable_image_urls():
     if not api_key:
         return jsonify({"success": False, "error": "No Airtable API key for this connection"}), 200
     try:
+        table_name = _airtable_table_name(api_key, base_id, table_id)
         urls = _airtable_fetch_image_urls(api_key, base_id, table_id)
-        return jsonify({"success": True, "urls": urls})
+        return jsonify({"success": True, "urls": urls, "table_name": table_name})
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 200
     except Exception as e:
